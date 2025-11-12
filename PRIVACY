@@ -1,0 +1,58 @@
+Privacy Policy for My TV - VLC
+
+Last Updated: November 11, 2025
+
+"My TV - VLC" ("we," "our," or "us") is committed to protecting your privacy. This Privacy Policy explains how we handle and treat your data when you use our application.
+
+Our fundamental privacy principle is simple: Your data is yours. We do not collect, store, or transmit any of your personal information to our servers. The application is designed to be a private client for your existing IPTV services, and all data remains on your device or is communicated directly between your device and your IPTV provider.
+
+Data We Do Not Collect
+
+To be clear, we do not collect any of the following:
+
+Personal Information: We do not collect your name, email address, phone number, location, or any other personally identifiable information.
+Analytics and Usage Data: We do not use any third-party analytics services (like Google Analytics, Firebase, etc.). We do not track how you use the app, which channels you watch, or what content you access.
+Crash Reports: The app does not contain any third-party crash reporting tools. Any crash logs are managed by Apple's own system and are only made available to us in an anonymized and aggregated form if you have opted-in to share them with developers.
+Data You Provide and How It Is Handled
+
+The app requires you to provide information to function. This data is handled as follows:
+
+IPTV Server Credentials: You are required to enter your IPTV server details, which may include a server name, URL, username, and password.
+
+Storage: This information is stored securely in a private, local database on your device only.
+Usage: These credentials are used exclusively to authenticate with your IPTV provider to fetch channel lists, EPG data, and stream content.
+Transmission: This data is sent directly to your IPTV provider's server for authentication. It is never sent to our servers or any other third party.
+User-Generated Content and Preferences: This includes Favourites, Custom Categories, channel ordering, and custom names or EPG mappings for channels.
+
+Storage: All this information is stored locally on your device only, either in the local database or in the app's standard user preferences.
+Usage: This data is used solely within the app to customize your user experience.
+Data Processed from Your IPTV Provider
+
+When you use the app, it communicates with your IPTV provider to fetch and display content. This includes:
+
+Channel and Media Metadata: The app downloads channel lists, VOD (Video on Demand) information, TV series details, and Electronic Program Guide (EPG) data from your provider. This data is cached locally in a database on your device to improve performance and enable offline browsing of the guide.
+Images: The app downloads and caches images, such as channel logos and movie posters, from URLs provided by your IPTV service. This cache is stored locally on your device.
+Media Streams: The app streams video and audio content directly from your IPTV provider. This content is processed for playback and is not stored on your device, except for temporary buffering required for smooth playback.
+All communication between the app and your IPTV provider is direct. We act as an intermediary for this data.
+
+Data Security
+
+We take the security of your locally stored data seriously. The app stores your server credentials and cached data in its private, sandboxed container on your device, which is protected by the operating system's security features.
+
+You have full control over your data and can delete it at any time using the "Reset All Data" option within the app's settings. This action will permanently remove all stored server details, cached channels, EPG data, and preferences from your device.
+
+Third-Party Services
+
+The app utilizes the VLCKit library for robust media playback. VLCKit is an open-source framework developed by the VideoLAN organization. Its privacy policy can be found on the VideoLAN website. We do not use any other third-party services for analytics, advertising, or data collection.
+
+Children's Privacy
+
+We do not knowingly collect any personal information from children under the age of 13. If you believe we have inadvertently collected such information, please contact us so we can promptly delete it. As we do not collect personal data, this is unlikely to occur.
+
+Changes to This Privacy Policy
+
+We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy within the app and on our App Store page. You are advised to review this Privacy Policy periodically for any changes.
+
+Contact Us
+
+If you have any questions about this Privacy Policy, please feel free to contact us at [Your Support Email Address].
