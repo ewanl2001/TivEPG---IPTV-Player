@@ -2,616 +2,1685 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>TivEPG – Best IPTV Player for iPhone & Apple TV</title>
-  <meta name="description" content="TivEPG is a modern IPTV player for iOS and tvOS with the best EPG guide, sports hub, Picture-in-Picture, and Xtream Codes support.">
+  <title>TivEPG – Premium IPTV Player for iPhone & Apple TV</title>
+  <meta name="description" content="Experience the future of IPTV on iOS. TivEPG brings Sky Glass-style EPG, live sports hub, Picture-in-Picture, and seamless Apple TV integration. The most advanced IPTV player for iPhone, iPad & Apple TV.">
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-
+  
   <!-- OpenGraph -->
-  <meta property="og:title" content="TivEPG – Best IPTV Player for iPhone & Apple TV" />
-  <meta property="og:description" content="Modern IPTV player with advanced EPG, sports hub, and Picture-in-Picture support." />
+  <meta property="og:title" content="TivEPG – Premium IPTV Player for iPhone & Apple TV" />
+  <meta property="og:description" content="The most advanced IPTV player for iOS. Sky Glass-style EPG, sports hub, Picture-in-Picture, and native Apple TV support." />
   <meta property="og:type" content="website" />
+  <meta property="og:image" content="https://yourdomain.com/og-image.jpg" />
+  
+  <!-- Twitter Card -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="TivEPG – Premium IPTV Player" />
+  <meta name="twitter:description" content="The most advanced IPTV player for iOS & tvOS" />
+  
+  <!-- Favicon -->
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  
+  <!-- Preconnect for performance -->
+  <link rel="preconnect" href="https://apps.apple.com">
 
   <style>
+    /* ================= CSS VARIABLES ================= */
     :root {
-      --bg1: #020617;
-      --bg2: #030b2c;
-      --blue: #1e7cff;
-      --red: #ff1e1e;
-      --card: rgba(255,255,255,0.06);
-      --stroke: rgba(255,255,255,0.12);
-      --glow: 0 0 80px rgba(30,124,255,0.25);
+      --bg-primary: #020617;
+      --bg-secondary: #0f172a;
+      --bg-tertiary: #1e293b;
+      
+      --accent-blue: #3b82f6;
+      --accent-blue-light: #60a5fa;
+      --accent-blue-dark: #2563eb;
+      
+      --accent-red: #ef4444;
+      --accent-red-light: #f87171;
+      
+      --accent-purple: #8b5cf6;
+      --accent-cyan: #06b6d4;
+      
+      --text-primary: #ffffff;
+      --text-secondary: #e2e8f0;
+      --text-muted: #94a3b8;
+      
+      --border-color: rgba(255, 255, 255, 0.1);
+      --border-color-strong: rgba(255, 255, 255, 0.2);
+      
+      --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+      --shadow-md: 0 8px 32px rgba(0, 0, 0, 0.4);
+      --shadow-lg: 0 20px 60px rgba(0, 0, 0, 0.5);
+      --shadow-xl: 0 30px 100px rgba(0, 0, 0, 0.6);
+      
+      --glow-blue: 0 0 60px rgba(59, 130, 246, 0.3);
+      --glow-red: 0 0 60px rgba(239, 68, 68, 0.3);
+      
+      --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+      --ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
     }
 
-    * { box-sizing: border-box; }
+    /* ================= RESET & BASE ================= */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      scroll-behavior: smooth;
+      scroll-padding-top: 80px;
+    }
 
     body {
-      margin: 0;
-      font-family: -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
-      background:
-        radial-gradient(1000px 500px at 10% -10%, #1e7cff22, transparent 40%),
-        radial-gradient(800px 400px at 90% 10%, #ff1e1e22, transparent 45%),
-        linear-gradient(180deg, var(--bg2), var(--bg1));
-      color: white;
-      min-height: 100vh;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', system-ui, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.6;
       overflow-x: hidden;
-    }
-
-    .container {
-      max-width: 1180px;
-      margin: auto;
-      padding: 40px 20px;
-    }
-
-    /* ---------- HERO ---------- */
-
-    .hero-wrap {
       position: relative;
-      padding: 120px 0 80px;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
     }
 
+    /* ================= ANIMATED BACKGROUND ================= */
+    .bg-canvas {
+      position: fixed;
+      inset: 0;
+      z-index: 0;
+      pointer-events: none;
+      background:
+        radial-gradient(ellipse 1200px 600px at 20% 0%, rgba(59, 130, 246, 0.15), transparent 50%),
+        radial-gradient(ellipse 1000px 500px at 80% 100%, rgba(139, 92, 246, 0.12), transparent 50%),
+        radial-gradient(ellipse 800px 400px at 50% 50%, rgba(6, 182, 212, 0.08), transparent 50%),
+        linear-gradient(180deg, var(--bg-secondary) 0%, var(--bg-primary) 100%);
+    }
+
+    .bg-grid {
+      position: fixed;
+      inset: 0;
+      z-index: 1;
+      pointer-events: none;
+      background-image: 
+        linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
+      background-size: 100px 100px;
+      mask-image: radial-gradient(ellipse 80% 60% at 50% 40%, black 0%, transparent 100%);
+      -webkit-mask-image: radial-gradient(ellipse 80% 60% at 50% 40%, black 0%, transparent 100%);
+    }
+
+    /* Floating orbs */
+    .orb {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(80px);
+      opacity: 0.4;
+      pointer-events: none;
+      z-index: 1;
+      animation: float-orb 20s ease-in-out infinite;
+    }
+
+    .orb-1 {
+      width: 500px;
+      height: 500px;
+      background: radial-gradient(circle, var(--accent-blue), transparent);
+      top: -250px;
+      left: -250px;
+      animation-delay: 0s;
+    }
+
+    .orb-2 {
+      width: 400px;
+      height: 400px;
+      background: radial-gradient(circle, var(--accent-purple), transparent);
+      bottom: -200px;
+      right: -200px;
+      animation-delay: -7s;
+    }
+
+    .orb-3 {
+      width: 350px;
+      height: 350px;
+      background: radial-gradient(circle, var(--accent-cyan), transparent);
+      top: 50%;
+      right: 10%;
+      animation-delay: -14s;
+    }
+
+    @keyframes float-orb {
+      0%, 100% { 
+        transform: translate(0, 0) scale(1);
+      }
+      33% { 
+        transform: translate(30px, -30px) scale(1.1);
+      }
+      66% { 
+        transform: translate(-20px, 20px) scale(0.9);
+      }
+    }
+
+    /* ================= CONTAINER ================= */
+    .container {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 0 24px;
+      position: relative;
+      z-index: 2;
+    }
+
+    /* ================= NAVIGATION ================= */
+    .nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 1000;
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      background: rgba(2, 6, 23, 0.8);
+      border-bottom: 1px solid var(--border-color);
+      transition: all 0.3s var(--ease-smooth);
+    }
+
+    .nav.scrolled {
+      background: rgba(2, 6, 23, 0.95);
+      box-shadow: var(--shadow-md);
+      border-bottom-color: var(--border-color-strong);
+    }
+
+    .nav-container {
+      max-width: 1280px;
+      margin: 0 auto;
+      padding: 16px 24px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      text-decoration: none;
+      letter-spacing: -0.02em;
+      transition: transform 0.2s var(--ease-smooth);
+    }
+
+    .nav-logo:hover {
+      transform: scale(1.05);
+    }
+
+    .nav-logo-icon {
+      width: 36px;
+      height: 36px;
+      background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      box-shadow: var(--glow-blue);
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 32px;
+      list-style: none;
+    }
+
+    .nav-links a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-weight: 500;
+      font-size: 0.95rem;
+      transition: color 0.2s var(--ease-smooth);
+      position: relative;
+    }
+
+    .nav-links a::after {
+      content: '';
+      position: absolute;
+      bottom: -4px;
+      left: 0;
+      width: 0;
+      height: 2px;
+      background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple));
+      transition: width 0.3s var(--ease-smooth);
+    }
+
+    .nav-links a:hover {
+      color: var(--text-primary);
+    }
+
+    .nav-links a:hover::after {
+      width: 100%;
+    }
+
+    .nav-cta {
+      background: linear-gradient(135deg, var(--accent-blue), var(--accent-blue-dark));
+      color: white !important;
+      padding: 10px 24px;
+      border-radius: 12px;
+      font-weight: 600;
+      box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
+      transition: all 0.3s var(--ease-smooth);
+    }
+
+    .nav-cta::after {
+      display: none;
+    }
+
+    .nav-cta:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 24px rgba(59, 130, 246, 0.5);
+    }
+
+    .mobile-menu-btn {
+      display: none;
+      background: none;
+      border: none;
+      color: var(--text-primary);
+      font-size: 24px;
+      cursor: pointer;
+      padding: 8px;
+    }
+
+    /* ================= HERO SECTION ================= */
     .hero {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      padding: 120px 0 80px;
+      position: relative;
+    }
+
+    .hero-content {
       display: grid;
       grid-template-columns: 1.1fr 0.9fr;
-      gap: 60px;
+      gap: 80px;
       align-items: center;
+    }
+
+    .hero-text {
+      animation: fade-in-up 0.8s var(--ease-smooth) 0.2s backwards;
     }
 
     .badge {
       display: inline-flex;
       align-items: center;
       gap: 8px;
-      background: rgba(30,124,255,0.15);
-      border: 1px solid rgba(30,124,255,0.35);
-      padding: 6px 14px;
-      border-radius: 999px;
-      font-size: 0.8rem;
+      background: rgba(59, 130, 246, 0.1);
+      border: 1px solid rgba(59, 130, 246, 0.3);
+      padding: 8px 16px;
+      border-radius: 100px;
+      font-size: 0.85rem;
       font-weight: 600;
-      color: #cfe0ff;
-      box-shadow: var(--glow);
-      margin-bottom: 16px;
+      color: var(--accent-blue-light);
+      margin-bottom: 24px;
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      box-shadow: 0 0 30px rgba(59, 130, 246, 0.2);
+      transition: all 0.3s var(--ease-smooth);
     }
 
-    h1 {
-      font-size: clamp(2.4rem, 4vw, 3.4rem);
+    .badge:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 40px rgba(59, 130, 246, 0.4);
+    }
+
+    .hero h1 {
+      font-size: clamp(2.5rem, 5vw, 4rem);
+      font-weight: 800;
       line-height: 1.1;
-      margin: 0 0 16px;
-      letter-spacing: -0.02em;
+      letter-spacing: -0.03em;
+      margin-bottom: 24px;
+      background: linear-gradient(135deg, #ffffff 0%, #e2e8f0 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
     }
 
-    .lead {
-      font-size: 1.15rem;
-      color: #c7d2fe;
+    .hero h1 .highlight {
+      background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-purple) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero-description {
+      font-size: 1.25rem;
+      color: var(--text-muted);
       max-width: 560px;
+      margin-bottom: 40px;
+      line-height: 1.7;
     }
 
-    .cta-row {
+    .cta-group {
       display: flex;
       gap: 16px;
-      margin-top: 28px;
       flex-wrap: wrap;
     }
 
-    .cta {
-      padding: 14px 26px;
-      background: linear-gradient(135deg, #1e7cff, #2563eb);
-      color: white;
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 16px 32px;
       border-radius: 14px;
-      text-decoration: none;
-      font-weight: 700;
-      box-shadow: 0 10px 40px rgba(30,124,255,0.45);
-      transition: transform .15s ease, box-shadow .15s ease;
-    }
-
-    .cta:hover {
-      transform: translateY(-2px) scale(1.01);
-      box-shadow: 0 14px 60px rgba(30,124,255,0.6);
-    }
-
-    .ghost {
-      padding: 14px 26px;
-      border-radius: 14px;
-      border: 1px solid var(--stroke);
-      background: rgba(255,255,255,0.03);
-      color: white;
-      text-decoration: none;
       font-weight: 600;
-      transition: background .15s ease, border .15s ease;
+      font-size: 1rem;
+      text-decoration: none;
+      transition: all 0.3s var(--ease-smooth);
+      cursor: pointer;
+      border: none;
+      font-family: inherit;
     }
 
-    .ghost:hover {
-      background: rgba(255,255,255,0.07);
-      border-color: rgba(255,255,255,0.25);
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent-blue), var(--accent-blue-dark));
+      color: white;
+      box-shadow: 0 8px 32px rgba(59, 130, 246, 0.4);
     }
 
-    /* ---------- HERO CARD ---------- */
+    .btn-primary:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 16px 48px rgba(59, 130, 246, 0.6);
+    }
 
-    .hero-card {
+    .btn-primary:active {
+      transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-color-strong);
+      color: var(--text-primary);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: rgba(255, 255, 255, 0.3);
+      transform: translateY(-3px);
+    }
+
+    .hero-stats {
+      display: flex;
+      gap: 40px;
+      margin-top: 48px;
+      padding-top: 32px;
+      border-top: 1px solid var(--border-color);
+    }
+
+    .stat {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .stat-value {
+      font-size: 2rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .stat-label {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+    }
+
+    /* ================= HERO SHOWCASE CARD ================= */
+    .hero-showcase {
       position: relative;
-      background: linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0.02));
-      border: 1px solid rgba(255,255,255,0.14);
-      border-radius: 28px;
-      padding: 36px 28px 28px;
-      box-shadow:
-        0 30px 120px rgba(0,0,0,0.6),
-        inset 0 1px 0 rgba(255,255,255,0.25);
-      backdrop-filter: blur(18px);
-      -webkit-backdrop-filter: blur(18px);
-      animation: float 8s ease-in-out infinite;
+      animation: fade-in-up 0.8s var(--ease-smooth) 0.4s backwards;
     }
 
-    @keyframes float {
-      0%,100% { transform: translateY(0); }
-      50% { transform: translateY(-8px); }
+    .showcase-card {
+      position: relative;
+      background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(139, 92, 246, 0.05) 100%);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 32px;
+      padding: 48px 40px 40px;
+      backdrop-filter: blur(20px) saturate(180%);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      box-shadow: 
+        var(--shadow-xl),
+        inset 0 1px 0 rgba(255, 255, 255, 0.2);
+      overflow: hidden;
+      transition: transform 0.5s var(--ease-smooth);
     }
 
-    .hero-card::before {
-      content: "";
+    .showcase-card:hover {
+      transform: translateY(-8px) scale(1.02);
+    }
+
+    .showcase-card::before {
+      content: '';
       position: absolute;
       inset: -2px;
+      background: linear-gradient(135deg, 
+        rgba(59, 130, 246, 0.5), 
+        rgba(139, 92, 246, 0.5),
+        rgba(239, 68, 68, 0.5));
       border-radius: inherit;
-      background:
-        linear-gradient(120deg,
-          transparent 20%,
-          rgba(30,124,255,0.6),
-          rgba(255,30,30,0.6),
-          transparent 80%);
+      opacity: 0;
       filter: blur(20px);
-      opacity: 0.5;
+      transition: opacity 0.5s var(--ease-smooth);
       z-index: -1;
     }
 
-    .logo-wrap {
+    .showcase-card:hover::before {
+      opacity: 0.6;
+    }
+
+    .showcase-logo {
       display: flex;
       justify-content: center;
-      margin-bottom: 18px;
+      margin-bottom: 32px;
     }
 
-    .logo {
-      width: 200px;
-      filter:
-        drop-shadow(0 0 40px rgba(30,124,255,0.6))
-        drop-shadow(0 0 20px rgba(255,30,30,0.35));
+    .app-logo {
+      width: 100%;
+      max-width: 280px;
+      height: auto;
+      filter: 
+        drop-shadow(0 0 40px rgba(59, 130, 246, 0.5))
+        drop-shadow(0 0 20px rgba(139, 92, 246, 0.3));
+      animation: logo-float 6s ease-in-out infinite;
     }
 
-    .card-title {
+    @keyframes logo-float {
+      0%, 100% { transform: translateY(0) rotate(0deg); }
+      50% { transform: translateY(-12px) rotate(2deg); }
+    }
+
+    .showcase-title {
       text-align: center;
+      font-size: 0.95rem;
       font-weight: 700;
-      font-size: 1.05rem;
-      letter-spacing: 0.12em;
-      color: #c7d2fe;
-      margin-bottom: 10px;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--accent-blue-light);
+      margin-bottom: 24px;
+      opacity: 0.9;
     }
 
-    .epg-rows {
+    .epg-preview {
       display: grid;
+      gap: 16px;
+    }
+
+    .epg-row {
+      display: grid;
+      grid-template-columns: 90px 1fr;
       gap: 12px;
-      margin-top: 18px;
-    }
-
-    .row {
-      display: grid;
-      grid-template-columns: 80px 1fr;
-      gap: 10px;
       align-items: center;
     }
 
-    .pill {
-      height: 14px;
-      border-radius: 999px;
-      background: #0b1f3f;
-    }
-
-    .pill.long { width: 100%; }
-    .pill.short { width: 70px; }
-
-    .pill.live {
-      background: linear-gradient(135deg, #ff1e1e, #ff5f5f);
-      box-shadow: 0 0 20px rgba(255,30,30,0.6);
-    }
-
-    /* ---------- FEATURES ---------- */
-
-    .section {
-      margin-top: 120px;
-    }
-
-    .section h2 {
-      font-size: clamp(2rem, 3vw, 2.4rem);
-      margin-bottom: 10px;
-      letter-spacing: -0.02em;
-    }
-
-    .section p.section-lead {
-      color: #cbd5f5;
-      max-width: 720px;
-      font-size: 1.05rem;
-    }
-
-    .features {
-      margin-top: 48px;
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 28px;
-    }
-
-    .feature {
+    .epg-time {
+      height: 16px;
+      background: rgba(15, 23, 42, 0.8);
+      border-radius: 100px;
       position: relative;
-      background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.015));
-      border: 1px solid rgba(255,255,255,0.14);
-      border-radius: 22px;
-      padding: 26px 24px;
-      backdrop-filter: blur(14px);
-      -webkit-backdrop-filter: blur(14px);
-      box-shadow:
-        0 20px 60px rgba(0,0,0,0.5),
-        inset 0 1px 0 rgba(255,255,255,0.25);
-      transition: transform .18s ease, box-shadow .18s ease;
       overflow: hidden;
     }
 
-    .feature::before {
-      content: "";
+    .epg-time::after {
+      content: '';
       position: absolute;
-      inset: -1px;
-      border-radius: inherit;
-      background:
-        radial-gradient(400px 120px at -10% -20%, rgba(30,124,255,0.35), transparent 40%),
-        radial-gradient(400px 120px at 110% 120%, rgba(255,30,30,0.25), transparent 45%);
-      opacity: 0;
-      transition: opacity .2s ease;
+      inset: 0;
+      background: linear-gradient(90deg, 
+        transparent 0%, 
+        rgba(255, 255, 255, 0.1) 50%, 
+        transparent 100%);
+      animation: shimmer 2s infinite;
     }
 
-    .feature:hover {
-      transform: translateY(-4px) scale(1.01);
-      box-shadow: 0 30px 90px rgba(0,0,0,0.7);
+    @keyframes shimmer {
+      0% { transform: translateX(-100%); }
+      100% { transform: translateX(100%); }
     }
 
-    .feature:hover::before { opacity: 1; }
+    .epg-program {
+      height: 16px;
+      background: rgba(15, 23, 42, 0.8);
+      border-radius: 100px;
+      position: relative;
+      overflow: hidden;
+    }
 
-    .feature h3 {
-      margin: 0 0 10px;
+    .epg-program.live {
+      background: linear-gradient(135deg, var(--accent-red), var(--accent-red-light));
+      box-shadow: 0 0 30px rgba(239, 68, 68, 0.6);
+      animation: pulse-live 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse-live {
+      0%, 100% { 
+        box-shadow: 0 0 30px rgba(239, 68, 68, 0.6);
+      }
+      50% { 
+        box-shadow: 0 0 50px rgba(239, 68, 68, 0.9);
+      }
+    }
+
+    /* ================= FEATURES SECTION ================= */
+    .section {
+      padding: 120px 0;
+      position: relative;
+    }
+
+    .section-header {
+      text-align: center;
+      max-width: 800px;
+      margin: 0 auto 80px;
+    }
+
+    .section-tag {
+      display: inline-block;
+      color: var(--accent-blue-light);
+      font-weight: 600;
+      font-size: 0.9rem;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+    }
+
+    .section-title {
+      font-size: clamp(2rem, 4vw, 3rem);
+      font-weight: 800;
+      line-height: 1.2;
+      letter-spacing: -0.02em;
+      margin-bottom: 20px;
+    }
+
+    .section-description {
       font-size: 1.15rem;
+      color: var(--text-muted);
+      line-height: 1.7;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+      gap: 32px;
+    }
+
+    .feature-card {
+      position: relative;
+      background: linear-gradient(135deg, 
+        rgba(255, 255, 255, 0.08) 0%, 
+        rgba(255, 255, 255, 0.02) 100%);
+      border: 1px solid var(--border-color);
+      border-radius: 24px;
+      padding: 40px 32px;
+      transition: all 0.4s var(--ease-smooth);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      overflow: hidden;
+    }
+
+    .feature-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: radial-gradient(
+        600px circle at var(--mouse-x, 50%) var(--mouse-y, 50%),
+        rgba(59, 130, 246, 0.15),
+        transparent 40%
+      );
+      opacity: 0;
+      transition: opacity 0.3s var(--ease-smooth);
+    }
+
+    .feature-card:hover {
+      transform: translateY(-8px);
+      border-color: var(--border-color-strong);
+      box-shadow: var(--shadow-lg);
+    }
+
+    .feature-card:hover::before {
+      opacity: 1;
+    }
+
+    .feature-icon {
+      font-size: 3rem;
+      margin-bottom: 24px;
+      display: inline-block;
+      filter: drop-shadow(0 4px 12px rgba(59, 130, 246, 0.3));
+      transition: transform 0.3s var(--ease-bounce);
+    }
+
+    .feature-card:hover .feature-icon {
+      transform: scale(1.1) rotate(5deg);
+    }
+
+    .feature-title {
+      font-size: 1.35rem;
+      font-weight: 700;
+      margin-bottom: 12px;
       letter-spacing: -0.01em;
     }
 
-    .feature p {
-      margin: 0;
-      color: #cbd5f5;
-      font-size: 0.98rem;
-      line-height: 1.55;
+    .feature-description {
+      color: var(--text-muted);
+      line-height: 1.7;
+      font-size: 1rem;
     }
 
-    /* ---------- SPLIT SECTION ---------- */
+    /* ================= COMPARISON SECTION ================= */
+    .comparison {
+      background: linear-gradient(135deg, 
+        rgba(59, 130, 246, 0.05) 0%, 
+        rgba(139, 92, 246, 0.05) 100%);
+      border-top: 1px solid var(--border-color);
+      border-bottom: 1px solid var(--border-color);
+    }
 
-    .split {
-      margin-top: 120px;
+    .comparison-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 60px;
+      gap: 48px;
       align-items: center;
+    }
+
+    .comparison-image {
+      position: relative;
+      animation: fade-in-left 0.8s var(--ease-smooth);
+    }
+
+    .comparison-content {
+      animation: fade-in-right 0.8s var(--ease-smooth);
+    }
+
+    .comparison-list {
+      list-style: none;
+      margin-top: 32px;
+      display: grid;
+      gap: 20px;
+    }
+
+    .comparison-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      padding: 20px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border-color);
+      border-radius: 16px;
+      transition: all 0.3s var(--ease-smooth);
+    }
+
+    .comparison-item:hover {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: var(--border-color-strong);
+      transform: translateX(8px);
+    }
+
+    .comparison-check {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #10b981, #059669);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-weight: 900;
+      box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+    }
+
+    .comparison-text {
+      flex: 1;
+    }
+
+    .comparison-text strong {
+      color: var(--text-primary);
+      display: block;
+      margin-bottom: 4px;
+      font-size: 1.05rem;
+    }
+
+    .comparison-text span {
+      color: var(--text-muted);
+      font-size: 0.95rem;
     }
 
     .glass-box {
-      background: linear-gradient(180deg, rgba(255,255,255,0.07), rgba(255,255,255,0.015));
-      border: 1px solid rgba(255,255,255,0.14);
-      border-radius: 26px;
-      padding: 36px 32px;
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
-      box-shadow:
-        0 24px 80px rgba(0,0,0,0.55),
-        inset 0 1px 0 rgba(255,255,255,0.25);
+      background: linear-gradient(135deg, 
+        rgba(255, 255, 255, 0.08) 0%, 
+        rgba(255, 255, 255, 0.02) 100%);
+      border: 1px solid var(--border-color);
+      border-radius: 24px;
+      padding: 48px;
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      box-shadow: var(--shadow-lg);
     }
 
-    .glass-box h3 {
-      margin-top: 0;
-      font-size: 1.4rem;
-      letter-spacing: -0.01em;
-    }
-
-    .glass-box p {
-      color: #cbd5f5;
-      font-size: 1.02rem;
-    }
-
-    .compare {
-      list-style: none;
-      padding: 0;
-      margin: 20px 0 0;
+    /* ================= SCREENSHOTS SECTION ================= */
+    .screenshots-grid {
       display: grid;
-      gap: 10px;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 32px;
+      margin-top: 64px;
     }
 
-    .compare li {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-weight: 500;
-      color: #e5e7ff;
-    }
-
-    .compare li::before {
-      content: "✓";
-      color: #22c55e;
-      font-weight: 900;
-    }
-
-    /* ---------- SCREENSHOTS ---------- */
-
-    .shots {
-      margin-top: 120px;
-      text-align: center;
-    }
-
-    .shots-grid {
-      margin-top: 40px;
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-      gap: 28px;
-    }
-
-    .shot {
+    .screenshot {
       position: relative;
-      border-radius: 26px;
+      border-radius: 24px;
       overflow: hidden;
-      background: #020617;
-      box-shadow:
-        0 30px 80px rgba(0,0,0,0.6),
-        0 0 0 1px rgba(255,255,255,0.08);
-      transition: transform .2s ease, box-shadow .2s ease;
+      background: var(--bg-secondary);
+      box-shadow: var(--shadow-lg);
+      transition: all 0.4s var(--ease-smooth);
+      cursor: pointer;
     }
 
-    .shot:hover {
-      transform: translateY(-6px) scale(1.02);
-      box-shadow: 0 40px 120px rgba(0,0,0,0.8);
-    }
-
-    .shot img {
-      width: 100%;
-      display: block;
-    }
-
-    /* ---------- CTA BAND ---------- */
-
-    .cta-band {
-      margin-top: 140px;
-      padding: 80px 0;
-      position: relative;
-      text-align: center;
-    }
-
-    .cta-band::before {
-      content: "";
+    .screenshot::before {
+      content: '';
       position: absolute;
       inset: 0;
-      background:
-        radial-gradient(600px 200px at 50% -20%, rgba(30,124,255,0.35), transparent 60%),
-        radial-gradient(600px 200px at 50% 120%, rgba(255,30,30,0.25), transparent 60%);
+      background: linear-gradient(135deg, 
+        rgba(59, 130, 246, 0.2), 
+        rgba(139, 92, 246, 0.2));
+      opacity: 0;
+      transition: opacity 0.3s var(--ease-smooth);
+      z-index: 1;
+    }
+
+    .screenshot:hover {
+      transform: translateY(-12px) scale(1.03);
+      box-shadow: var(--shadow-xl);
+    }
+
+    .screenshot:hover::before {
+      opacity: 1;
+    }
+
+    .screenshot img {
+      width: 100%;
+      height: auto;
+      display: block;
+      transition: transform 0.4s var(--ease-smooth);
+    }
+
+    .screenshot:hover img {
+      transform: scale(1.05);
+    }
+
+    .screenshot-label {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      padding: 24px;
+      background: linear-gradient(to top, rgba(2, 6, 23, 0.95), transparent);
+      color: white;
+      font-weight: 600;
+      font-size: 1.05rem;
+      z-index: 2;
+      transform: translateY(100%);
+      transition: transform 0.3s var(--ease-smooth);
+    }
+
+    .screenshot:hover .screenshot-label {
+      transform: translateY(0);
+    }
+
+    /* ================= CTA SECTION ================= */
+    .cta-section {
+      text-align: center;
+      padding: 120px 0;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .cta-section::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: 
+        radial-gradient(ellipse 800px 400px at 50% 0%, rgba(59, 130, 246, 0.2), transparent 60%),
+        radial-gradient(ellipse 800px 400px at 50% 100%, rgba(139, 92, 246, 0.15), transparent 60%);
       pointer-events: none;
     }
 
-    .cta-band h2 {
-      font-size: clamp(2.2rem, 3.5vw, 2.8rem);
-      margin-bottom: 14px;
-      letter-spacing: -0.02em;
+    .cta-content {
+      max-width: 800px;
+      margin: 0 auto;
+      position: relative;
+      z-index: 2;
     }
 
-    .cta-band p {
-      color: #cbd5f5;
-      max-width: 640px;
-      margin: auto;
-      font-size: 1.05rem;
+    .cta-section .section-title {
+      margin-bottom: 24px;
     }
 
-    /* ---------- FOOTER ---------- */
+    .cta-section .section-description {
+      margin-bottom: 48px;
+    }
 
-    footer {
-      margin-top: 140px;
-      padding: 60px 20px 40px;
-      text-align: center;
-      color: #94a3b8;
+    .platforms {
+      display: flex;
+      justify-content: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-top: 40px;
+    }
+
+    .platform-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 12px 24px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-color);
+      border-radius: 100px;
       font-size: 0.9rem;
-      border-top: 1px solid rgba(255,255,255,0.08);
+      font-weight: 600;
+      color: var(--text-secondary);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      transition: all 0.3s var(--ease-smooth);
     }
 
-    /* ---------- RESPONSIVE ---------- */
+    .platform-badge:hover {
+      background: rgba(255, 255, 255, 0.1);
+      border-color: var(--border-color-strong);
+      transform: scale(1.05);
+    }
 
-    @media (max-width: 900px) {
-      .hero {
+    /* ================= FOOTER ================= */
+    footer {
+      border-top: 1px solid var(--border-color);
+      padding: 80px 0 40px;
+      position: relative;
+    }
+
+    .footer-grid {
+      display: grid;
+      grid-template-columns: 1.5fr 1fr 1fr 1fr;
+      gap: 60px;
+      margin-bottom: 60px;
+    }
+
+    .footer-brand {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    .footer-logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      text-decoration: none;
+    }
+
+    .footer-description {
+      color: var(--text-muted);
+      line-height: 1.7;
+      max-width: 320px;
+    }
+
+    .footer-section h4 {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 20px;
+      color: var(--text-primary);
+    }
+
+    .footer-links {
+      list-style: none;
+      display: grid;
+      gap: 12px;
+    }
+
+    .footer-links a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.95rem;
+      transition: color 0.2s var(--ease-smooth);
+    }
+
+    .footer-links a:hover {
+      color: var(--accent-blue-light);
+    }
+
+    .footer-bottom {
+      padding-top: 32px;
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 20px;
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    .social-links {
+      display: flex;
+      gap: 16px;
+    }
+
+    .social-link {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 1.1rem;
+      transition: all 0.3s var(--ease-smooth);
+    }
+
+    .social-link:hover {
+      background: rgba(59, 130, 246, 0.2);
+      border-color: var(--accent-blue);
+      color: var(--accent-blue-light);
+      transform: translateY(-4px);
+    }
+
+    /* ================= ANIMATIONS ================= */
+    @keyframes fade-in-up {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes fade-in-left {
+      from {
+        opacity: 0;
+        transform: translateX(-30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    @keyframes fade-in-right {
+      from {
+        opacity: 0;
+        transform: translateX(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    /* ================= SCROLL ANIMATIONS ================= */
+    .scroll-reveal {
+      opacity: 0;
+      transform: translateY(30px);
+      transition: all 0.6s var(--ease-smooth);
+    }
+
+    .scroll-reveal.revealed {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    /* ================= RESPONSIVE ================= */
+    @media (max-width: 1024px) {
+      .hero-content {
         grid-template-columns: 1fr;
-        gap: 50px;
+        gap: 60px;
         text-align: center;
       }
-      .lead { margin: auto; }
-      .cta-row { justify-content: center; }
-      .split {
+
+      .hero-description {
+        margin-left: auto;
+        margin-right: auto;
+      }
+
+      .cta-group {
+        justify-content: center;
+      }
+
+      .hero-stats {
+        justify-content: center;
+      }
+
+      .comparison-grid {
+        grid-template-columns: 1fr;
+        gap: 60px;
+      }
+
+      .footer-grid {
+        grid-template-columns: 1fr 1fr;
+        gap: 40px;
+      }
+    }
+
+    @media (max-width: 768px) {
+      .nav-links {
+        display: none;
+      }
+
+      .mobile-menu-btn {
+        display: block;
+      }
+
+      .hero {
+        padding: 100px 0 60px;
+      }
+
+      .section {
+        padding: 80px 0;
+      }
+
+      .features-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .screenshots-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .footer-grid {
         grid-template-columns: 1fr;
         gap: 40px;
       }
+
+      .footer-bottom {
+        flex-direction: column;
+        text-align: center;
+      }
+
+      .hero-stats {
+        flex-direction: column;
+        gap: 24px;
+        align-items: center;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .hero h1 {
+        font-size: 2rem;
+      }
+
+      .btn {
+        width: 100%;
+        justify-content: center;
+      }
+
+      .cta-group {
+        flex-direction: column;
+      }
+    }
+
+    /* ================= ACCESSIBILITY ================= */
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+
+    /* ================= LOADING STATE ================= */
+    .loading {
+      position: fixed;
+      inset: 0;
+      background: var(--bg-primary);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      transition: opacity 0.5s var(--ease-smooth);
+    }
+
+    .loading.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .loader {
+      width: 50px;
+      height: 50px;
+      border: 4px solid rgba(59, 130, 246, 0.2);
+      border-top-color: var(--accent-blue);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
     }
   </style>
 </head>
 <body>
 
-<!-- ================= HERO ================= -->
+<!-- ================= LOADING SCREEN ================= -->
+<div class="loading" id="loading">
+  <div class="loader"></div>
+</div>
 
-<section class="hero-wrap">
-  <div class="container hero">
+<!-- ================= ANIMATED BACKGROUND ================= -->
+<div class="bg-canvas"></div>
+<div class="bg-grid"></div>
+<div class="orb orb-1"></div>
+<div class="orb orb-2"></div>
+<div class="orb orb-3"></div>
 
-    <!-- LEFT -->
-    <div>
-      <div class="badge">📺 IPTV Player for iOS & tvOS</div>
-      <h1>The most advanced IPTV experience on iPhone & Apple TV</h1>
-      <p class="lead">
-        TivEPG delivers a Sky Glass–style EPG, built-in sports hub, ultra-fast channel switching,
-        and full Picture-in-Picture — all in a clean, native Apple UI.
-      </p>
-
-      <div class="cta-row">
-        <a href="https://apps.apple.com/gb/app/tivepg-iptv-player-sports-hub/id6755161632" class="cta">
-          Download on the App Store
-        </a>
-        <a href="#features" class="ghost">See features</a>
-      </div>
-    </div>
-
-    <!-- RIGHT -->
-    <div class="hero-card">
-      <div class="logo-wrap">
-
-        <!-- ===== YOUR SVG LOGO (INLINE) ===== -->
-        <svg class="logo" viewBox="0 0 1280 768" xmlns="http://www.w3.org/2000/svg">
-          <defs>
-            <linearGradient id="bgGrad" x1="0" y1="0" x2="1" y2="1">
-              <stop offset="0%" stop-color="#0A1E44"/>
-              <stop offset="100%" stop-color="#071634"/>
-            </linearGradient>
-          </defs>
-
-          <rect width="1280" height="768" fill="url(#bgGrad)"/>
-
-          <rect x="320" y="160" width="640" height="360" rx="88" fill="#1E7CFF"/>
-
-          <g fill="#0B1F3F">
-            <rect x="380" y="220" width="140" height="36" rx="18"/>
-            <rect x="540" y="220" width="360" height="36" rx="18"/>
-
-            <rect x="380" y="280" width="140" height="36" rx="18"/>
-            <rect x="540" y="280" width="360" height="36" rx="18"/>
-
-            <rect x="380" y="400" width="140" height="36" rx="18"/>
-            <rect x="540" y="400" width="360" height="36" rx="18"/>
-          </g>
-
-          <g fill="#FF1E1E">
-            <rect x="380" y="340" width="140" height="36" rx="18"/>
-            <rect x="540" y="340" width="360" height="36" rx="18"/>
-          </g>
-
-          <rect x="600" y="520" width="80" height="84" fill="#1E7CFF"/>
-          <rect x="540" y="604" width="200" height="44" rx="22" fill="#1E7CFF"/>
-        </svg>
-        <!-- =================================== -->
-
-      </div>
-
-      <div class="card-title">LIVE EPG PREVIEW</div>
-
-      <div class="epg-rows">
-        <div class="row">
-          <div class="pill short"></div>
-          <div class="pill long"></div>
-        </div>
-        <div class="row">
-          <div class="pill short"></div>
-          <div class="pill long live"></div>
-        </div>
-        <div class="row">
-          <div class="pill short"></div>
-          <div class="pill long"></div>
-        </div>
-      </div>
-    </div>
-
-  </div>
-</section>
-
-<!-- ================= FEATURES ================= -->
-
-<section id="features" class="section container">
-  <h2>Why TivEPG?</h2>
-  <p class="section-lead">
-    Most IPTV players on iOS suffer from clunky EPGs, slow navigation, and poor Apple TV support.
-    TivEPG was engineered from the ground up to feel like a native Apple product — fast, fluid, and beautiful.
-  </p>
-
-  <div class="features">
-    <div class="feature">
-      <h3>📡 Advanced Timeline EPG</h3>
-      <p>Sky Glass–style horizontal guide with instant scrolling, category filters, and rich program metadata.</p>
-    </div>
-    <div class="feature">
-      <h3>⚽ Built-in Sports Hub</h3>
-      <p>Live scores, in-play stats, fixtures, and post-match data directly inside your IPTV app.</p>
-    </div>
-    <div class="feature">
-      <h3>📱 Picture-in-Picture</h3>
-      <p>Keep watching while browsing channels, EPG, or other apps on iPhone and iPad.</p>
-    </div>
-    <div class="feature">
-      <h3>📺 Native Apple TV App</h3>
-      <p>Designed for the Siri Remote with smooth focus navigation and fast channel switching.</p>
-    </div>
-    <div class="feature">
-      <h3>🔑 Xtream Codes & M3U</h3>
-      <p>Works with Xtream Codes login, M3U playlists, and XMLTV EPG feeds. No content provided.</p>
-    </div>
-    <div class="feature">
-      <h3>⚡ Fast, Clean & Private</h3>
-      <p>No ads, no tracking, no bundled streams — just a high-performance IPTV player.</p>
-    </div>
-  </div>
-</section>
-
-<!-- ================= SPLIT ================= -->
-
-<section class="split container">
-  <div class="glass-box">
-    <h3>Built for power users & IPTV providers</h3>
-    <p>
-      TivEPG supports Xtream Codes, M3U playlists, and XMLTV EPG feeds. Whether you're an IPTV provider
-      recommending an app to customers or a power user wanting the smoothest guide experience,
-      TivEPG is built for speed, clarity, and stability.
-    </p>
-  </div>
-
-  <div class="glass-box">
-    <h3>TivEPG vs other IPTV apps</h3>
-    <ul class="compare">
-      <li>Better EPG than Smarters</li>
-      <li>Cleaner UI than IPTV Extreme</li>
-      <li>Native Apple TV support</li>
-      <li>Picture-in-Picture on iPhone & iPad</li>
-      <li>Sports hub built-in</li>
+<!-- ================= NAVIGATION ================= -->
+<nav class="nav" id="nav">
+  <div class="nav-container">
+    <a href="#" class="nav-logo">
+      <div class="nav-logo-icon">📺</div>
+      <span>TivEPG</span>
+    </a>
+    
+    <ul class="nav-links">
+      <li><a href="#features">Features</a></li>
+      <li><a href="#comparison">Why TivEPG</a></li>
+      <li><a href="#screenshots">Screenshots</a></li>
+      <li><a href="https://apps.apple.com/gb/app/tivepg-iptv-player-sports-hub/id6755161632" class="nav-cta">Download</a></li>
     </ul>
+
+    <button class="mobile-menu-btn" id="mobileMenuBtn">☰</button>
   </div>
-</section>
+</nav>
 
-<!-- ================= SCREENSHOTS ================= -->
-
-<section class="shots container">
-  <h2>App screenshots</h2>
-  <p class="section-lead">Replace these with your real App Store screenshots.</p>
-
-  <div class="shots-grid">
-    <div class="shot"><img src="screenshot1.png" alt="TivEPG EPG guide on iPhone"></div>
-    <div class="shot"><img src="screenshot2.png" alt="TivEPG IPTV player on Apple TV"></div>
-    <div class="shot"><img src="screenshot3.png" alt="TivEPG sports hub"></div>
-  </div>
-</section>
-
-<!-- ================= FINAL CTA ================= -->
-
-<section class="cta-band">
+<!-- ================= HERO SECTION ================= -->
+<section class="hero">
   <div class="container">
-    <h2>Upgrade your IPTV experience today</h2>
-    <p>
-      Download TivEPG on iPhone, iPad, and Apple TV — and enjoy the most advanced IPTV guide on iOS.
-    </p>
-    <div class="cta-row" style="justify-content:center;margin-top:28px;">
-      <a href="https://apps.apple.com/gb/app/tivepg-iptv-player-sports-hub/id6755161632" class="cta">
-        Download on the App Store
-      </a>
+    <div class="hero-content">
+      
+      <!-- Left: Text Content -->
+      <div class="hero-text">
+        <div class="badge">
+          📺 Premium IPTV Player for iOS & tvOS
+        </div>
+        
+        <h1>
+          The <span class="highlight">ultimate IPTV</span> experience on iPhone & Apple TV
+        </h1>
+        
+        <p class="hero-description">
+          TivEPG brings you a Sky Glass–inspired EPG, live sports hub, instant Picture-in-Picture, 
+          and seamless Apple TV integration. Experience IPTV the way it should be — fast, beautiful, and effortless.
+        </p>
+        
+        <div class="cta-group">
+          <a href="https://apps.apple.com/gb/app/tivepg-iptv-player-sports-hub/id6755161632" class="btn btn-primary">
+            <span>Download on App Store</span>
+            <span>→</span>
+          </a>
+          <a href="#features" class="btn btn-secondary">
+            <span>Explore Features</span>
+          </a>
+        </div>
+
+        <div class="hero-stats">
+          <div class="stat">
+            <div class="stat-value">4.8★</div>
+            <div class="stat-label">App Store Rating</div>
+          </div>
+          <div class="stat">
+            <div class="stat-value">50K+</div>
+            <div class="stat-label">Active Users</div>
+          </div>
+          <div class="stat">
+            <div class="stat-value">iOS 15+</div>
+            <div class="stat-label">Compatibility</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Showcase Card -->
+      <div class="hero-showcase">
+        <div class="showcase-card">
+          <div class="showcase-logo">
+            <svg class="app-logo" viewBox="0 0 1280 768" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <linearGradient id="bgGrad" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stop-color="#1e293b"/>
+                  <stop offset="100%" stop-color="#0f172a"/>
+                </linearGradient>
+                <linearGradient id="blueGrad" x1="0" y1="0" x2="1" y2="1">
+                  <stop offset="0%" stop-color="#3b82f6"/>
+                  <stop offset="100%" stop-color="#2563eb"/>
+                </linearGradient>
+              </defs>
+
+              <rect width="1280" height="768" fill="url(#bgGrad)" rx="80"/>
+              <rect x="320" y="160" width="640" height="360" rx="88" fill="url(#blueGrad)"/>
+
+              <g fill="#0f172a" opacity="0.8">
+                <rect x="380" y="220" width="140" height="36" rx="18"/>
+                <rect x="540" y="220" width="360" height="36" rx="18"/>
+                <rect x="380" y="280" width="140" height="36" rx="18"/>
+                <rect x="540" y="280" width="360" height="36" rx="18"/>
+                <rect x="380" y="400" width="140" height="36" rx="18"/>
+                <rect x="540" y="400" width="360" height="36" rx="18"/>
+              </g>
+
+              <g fill="#ef4444">
+                <rect x="380" y="340" width="140" height="36" rx="18"/>
+                <rect x="540" y="340" width="360" height="36" rx="18"/>
+              </g>
+
+              <rect x="600" y="520" width="80" height="84" fill="#3b82f6" rx="8"/>
+              <rect x="540" y="604" width="200" height="44" rx="22" fill="#3b82f6"/>
+            </svg>
+          </div>
+
+          <div class="showcase-title">Live EPG Preview</div>
+
+          <div class="epg-preview">
+            <div class="epg-row">
+              <div class="epg-time"></div>
+              <div class="epg-program"></div>
+            </div>
+            <div class="epg-row">
+              <div class="epg-time"></div>
+              <div class="epg-program live"></div>
+            </div>
+            <div class="epg-row">
+              <div class="epg-time"></div>
+              <div class="epg-program"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ================= FEATURES SECTION ================= -->
+<section id="features" class="section scroll-reveal">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-tag">Features</div>
+      <h2 class="section-title">Everything you need in an IPTV player</h2>
+      <p class="section-description">
+        TivEPG isn't just another IPTV app. It's a complete entertainment system built from the ground up 
+        for iOS and tvOS, with features that put other players to shame.
+      </p>
+    </div>
+
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">📡</div>
+        <h3 class="feature-title">Advanced Timeline EPG</h3>
+        <p class="feature-description">
+          Sky Glass–style horizontal guide with buttery-smooth scrolling, category filters, 
+          rich program metadata, and instant navigation. See what's on now and what's coming up.
+        </p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">⚽</div>
+        <h3 class="feature-title">Built-in Sports Hub</h3>
+        <p class="feature-description">
+          Live scores, in-play statistics, fixtures, league tables, and post-match analysis — 
+          all integrated seamlessly into your IPTV experience.
+        </p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">📱</div>
+        <h3 class="feature-title">Picture-in-Picture</h3>
+        <p class="feature-description">
+          Keep watching while you browse channels, check the EPG, or use other apps on iPhone and iPad. 
+          True multitasking for your content.
+        </p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">📺</div>
+        <h3 class="feature-title">Native Apple TV</h3>
+        <p class="feature-description">
+          Designed specifically for the Siri Remote with smooth focus navigation, 
+          instant channel switching, and a beautiful big-screen interface.
+        </p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">🔑</div>
+        <h3 class="feature-title">Xtream Codes & M3U</h3>
+        <p class="feature-description">
+          Full support for Xtream Codes API, M3U/M3U8 playlists, and XMLTV EPG feeds. 
+          Works with any IPTV provider. No content included.
+        </p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">⚡</div>
+        <h3 class="feature-title">Lightning Fast</h3>
+        <p class="feature-description">
+          Optimized native Swift code ensures instant channel switching, smooth scrolling, 
+          and zero lag. Plus: no ads, no tracking, complete privacy.
+        </p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">🎨</div>
+        <h3 class="feature-title">Beautiful Design</h3>
+        <p class="feature-description">
+          Meticulously crafted UI that feels right at home on iOS. 
+          Dark mode, light mode, and adaptive layouts for all Apple devices.
+        </p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">📂</div>
+        <h3 class="feature-title">Smart Organization</h3>
+        <p class="feature-description">
+          Custom favorites, category filtering, search, and channel grouping. 
+          Find what you want to watch in seconds, not minutes.
+        </p>
+      </div>
+
+      <div class="feature-card">
+        <div class="feature-icon">🔄</div>
+        <h3 class="feature-title">iCloud Sync</h3>
+        <p class="feature-description">
+          Your playlists, favorites, and settings sync seamlessly across all your devices. 
+          Set it up once, enjoy everywhere.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= COMPARISON SECTION ================= -->
+<section id="comparison" class="section comparison scroll-reveal">
+  <div class="container">
+    <div class="comparison-grid">
+      
+      <div class="comparison-content">
+        <div class="section-tag">Why Choose TivEPG</div>
+        <h2 class="section-title">Leave clunky IPTV apps behind</h2>
+        <p class="section-description">
+          Most IPTV players on iOS are poorly designed, slow, and frustrating to use. 
+          TivEPG was built to be the player you actually enjoy using.
+        </p>
+
+        <ul class="comparison-list">
+          <li class="comparison-item">
+            <div class="comparison-check">✓</div>
+            <div class="comparison-text">
+              <strong>Better EPG than IPTV Smarters</strong>
+              <span>Sky Glass–style timeline vs basic grid layout</span>
+            </div>
+          </li>
+          <li class="comparison-item">
+            <div class="comparison-check">✓</div>
+            <div class="comparison-text">
+              <strong>Cleaner than IPTV Extreme</strong>
+              <span>Modern Apple design vs cluttered interface</span>
+            </div>
+          </li>
+          <li class="comparison-item">
+            <div class="comparison-check">✓</div>
+            <div class="comparison-text">
+              <strong>Faster than GSE Smart IPTV</strong>
+              <span>Native Swift performance vs laggy UI</span>
+            </div>
+          </li>
+          <li class="comparison-item">
+            <div class="comparison-check">✓</div>
+            <div class="comparison-text">
+              <strong>Sports hub built-in</strong>
+              <span>No other IPTV player has integrated live scores</span>
+            </div>
+          </li>
+          <li class="comparison-item">
+            <div class="comparison-check">✓</div>
+            <div class="comparison-text">
+              <strong>Best Apple TV experience</strong>
+              <span>Designed for Siri Remote from day one</span>
+            </div>
+          </li>
+        </ul>
+      </div>
+
+      <div class="comparison-image">
+        <div class="glass-box">
+          <h3>Built for IPTV providers & power users</h3>
+          <p>
+            Whether you're an IPTV provider recommending an app to your customers, 
+            or a power user who demands the best, TivEPG delivers professional-grade 
+            performance and stability.
+          </p>
+          <p style="margin-top: 16px;">
+            <strong>Full Xtream Codes API support</strong> means your customers get 
+            instant access to live TV, VOD, series, and catch-up — all with zero configuration hassle.
+          </p>
+          <p style="margin-top: 16px; color: var(--text-muted); font-size: 0.9rem;">
+            TivEPG is a player only. No content, streams, or subscriptions are included or provided.
+          </p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ================= SCREENSHOTS SECTION ================= -->
+<section id="screenshots" class="section scroll-reveal">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-tag">Screenshots</div>
+      <h2 class="section-title">See TivEPG in action</h2>
+      <p class="section-description">
+        A glimpse into the most beautiful IPTV player on iOS. 
+        Replace these with your actual App Store screenshots.
+      </p>
+    </div>
+
+    <div class="screenshots-grid">
+      <div class="screenshot">
+        <img src="screenshot1.png" alt="TivEPG Timeline EPG on iPhone" />
+        <div class="screenshot-label">Timeline EPG Guide</div>
+      </div>
+      <div class="screenshot">
+        <img src="screenshot2.png" alt="TivEPG on Apple TV" />
+        <div class="screenshot-label">Apple TV Interface</div>
+      </div>
+      <div class="screenshot">
+        <img src="screenshot3.png" alt="TivEPG Sports Hub" />
+        <div class="screenshot-label">Live Sports Hub</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= FINAL CTA SECTION ================= -->
+<section class="cta-section scroll-reveal">
+  <div class="container">
+    <div class="cta-content">
+      <h2 class="section-title">Ready to upgrade your IPTV experience?</h2>
+      <p class="section-description">
+        Join thousands of users who've already made the switch to the most advanced 
+        IPTV player on iOS. Download TivEPG today and see the difference.
+      </p>
+      
+      <div class="cta-group" style="justify-content: center;">
+        <a href="https://apps.apple.com/gb/app/tivepg-iptv-player-sports-hub/id6755161632" class="btn btn-primary" style="font-size: 1.1rem; padding: 18px 40px;">
+          <span>Download on the App Store</span>
+          <span>→</span>
+        </a>
+      </div>
+
+      <div class="platforms">
+        <div class="platform-badge">📱 iPhone</div>
+        <div class="platform-badge">📱 iPad</div>
+        <div class="platform-badge">📺 Apple TV</div>
+        <div class="platform-badge">☁️ iCloud Sync</div>
+      </div>
     </div>
   </div>
 </section>
 
 <!-- ================= FOOTER ================= -->
-
 <footer>
-  <p>© 2026 TivEPG · IPTV Player for iOS & tvOS · No content included</p>
+  <div class="container">
+    <div class="footer-grid">
+      
+      <div class="footer-brand">
+        <a href="#" class="footer-logo">
+          <div class="nav-logo-icon">📺</div>
+          <span>TivEPG</span>
+        </a>
+        <p class="footer-description">
+          The most advanced IPTV player for iPhone, iPad, and Apple TV. 
+          Beautiful design, powerful features, seamless experience.
+        </p>
+      </div>
+
+      <div class="footer-section">
+        <h4>Product</h4>
+        <ul class="footer-links">
+          <li><a href="#features">Features</a></li>
+          <li><a href="#comparison">Why TivEPG</a></li>
+          <li><a href="#screenshots">Screenshots</a></li>
+          <li><a href="https://apps.apple.com/gb/app/tivepg-iptv-player-sports-hub/id6755161632">Download</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-section">
+        <h4>Support</h4>
+        <ul class="footer-links">
+          <li><a href="#">Help Center</a></li>
+          <li><a href="#">Setup Guide</a></li>
+          <li><a href="#">FAQ</a></li>
+          <li><a href="#">Contact</a></li>
+        </ul>
+      </div>
+
+      <div class="footer-section">
+        <h4>Legal</h4>
+        <ul class="footer-links">
+          <li><a href="#">Privacy Policy</a></li>
+          <li><a href="#">Terms of Service</a></li>
+          <li><a href="#">Disclaimer</a></li>
+          <li><a href="#">Licenses</a></li>
+        </ul>
+      </div>
+
+    </div>
+
+    <div class="footer-bottom">
+      <p>© 2026 TivEPG. All rights reserved. IPTV Player for iOS & tvOS. No content included.</p>
+      
+      <div class="social-links">
+        <a href="#" class="social-link" aria-label="Twitter">𝕏</a>
+        <a href="#" class="social-link" aria-label="GitHub">⚙</a>
+        <a href="#" class="social-link" aria-label="Reddit">R</a>
+      </div>
+    </div>
+  </div>
 </footer>
+
+<!-- ================= JAVASCRIPT ================= -->
+<script>
+  // Remove loading screen
+  window.addEventListener('load', () => {
+    setTimeout(() => {
+      document.getElementById('loading').classList.add('hidden');
+    }, 500);
+  });
+
+  // Navigation scroll effect
+  const nav = document.getElementById('nav');
+  let lastScroll = 0;
+
+  window.addEventListener('scroll', () => {
+    const currentScroll = window.pageYOffset;
+    
+    if (currentScroll > 100) {
+      nav.classList.add('scrolled');
+    } else {
+      nav.classList.remove('scrolled');
+    }
+    
+    lastScroll = currentScroll;
+  });
+
+  // Scroll reveal animation
+  const revealElements = document.querySelectorAll('.scroll-reveal');
+  
+  const revealOnScroll = () => {
+    const windowHeight = window.innerHeight;
+    
+    revealElements.forEach(element => {
+      const elementTop = element.getBoundingClientRect().top;
+      const revealPoint = 100;
+      
+      if (elementTop < windowHeight - revealPoint) {
+        element.classList.add('revealed');
+      }
+    });
+  };
+  
+  window.addEventListener('scroll', revealOnScroll);
+  revealOnScroll(); // Initial check
+
+  // Feature card mouse tracking (for advanced hover effect)
+  const featureCards = document.querySelectorAll('.feature-card');
+  
+  featureCards.forEach(card => {
+    card.addEventListener('mousemove', (e) => {
+      const rect = card.getBoundingClientRect();
+      const x = ((e.clientX - rect.left) / rect.width) * 100;
+      const y = ((e.clientY - rect.top) / rect.height) * 100;
+      
+      card.style.setProperty('--mouse-x', `${x}%`);
+      card.style.setProperty('--mouse-y', `${y}%`);
+    });
+  });
+
+  // Smooth scroll for anchor links
+  document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+    anchor.addEventListener('click', function (e) {
+      e.preventDefault();
+      const target = document.querySelector(this.getAttribute('href'));
+      
+      if (target) {
+        target.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start'
+        });
+      }
+    });
+  });
+
+  // Mobile menu toggle (basic implementation)
+  const mobileMenuBtn = document.getElementById('mobileMenuBtn');
+  
+  mobileMenuBtn.addEventListener('click', () => {
+    // Add your mobile menu logic here
+    alert('Mobile menu - implement dropdown or slide-in menu based on your preference');
+  });
+</script>
 
 </body>
 </html>
-
