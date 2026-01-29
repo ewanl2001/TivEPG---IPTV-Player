@@ -906,7 +906,8 @@
 
     .footer-grid {
       display: grid;
-      grid-template-columns: 1.5fr 1fr 1fr 1fr;
+      /* Adjusted grid layout to fit fewer items */
+      grid-template-columns: 1.5fr 1fr;
       gap: 60px;
       margin-bottom: 60px;
     }
@@ -1069,8 +1070,18 @@
       }
 
       .footer-grid {
-        grid-template-columns: 1fr 1fr;
+        /* Adjusted for responsiveness */
+        grid-template-columns: 1fr;
         gap: 40px;
+        text-align: center;
+      }
+      
+      .footer-brand {
+         align-items: center;
+      }
+      
+      .footer-description {
+         max-width: 100%;
       }
     }
 
@@ -1097,11 +1108,6 @@
 
       .screenshots-grid {
         grid-template-columns: 1fr;
-      }
-
-      .footer-grid {
-        grid-template-columns: 1fr;
-        gap: 40px;
       }
 
       .footer-bottom {
@@ -1256,37 +1262,58 @@
       <div class="hero-showcase">
         <div class="showcase-card">
           <div class="showcase-logo">
-            <svg class="app-logo" viewBox="0 0 1280 768" xmlns="http://www.w3.org/2000/svg">
+            <!-- REPLACED LOGO SVG HERE -->
+            <svg
+              class="app-logo"
+              width="1280"
+              height="768"
+              viewBox="0 0 1280 768"
+              xmlns="http://www.w3.org/2000/svg"
+              shape-rendering="geometricPrecision"
+              text-rendering="geometricPrecision">
+
+              <!-- BACK LAYER (solid background) -->
               <defs>
                 <linearGradient id="bgGrad" x1="0" y1="0" x2="1" y2="1">
-                  <stop offset="0%" stop-color="#1e293b"/>
-                  <stop offset="100%" stop-color="#0f172a"/>
-                </linearGradient>
-                <linearGradient id="blueGrad" x1="0" y1="0" x2="1" y2="1">
-                  <stop offset="0%" stop-color="#3b82f6"/>
-                  <stop offset="100%" stop-color="#2563eb"/>
+                  <stop offset="0%" stop-color="#0A1E44"/>
+                  <stop offset="100%" stop-color="#071634"/>
                 </linearGradient>
               </defs>
 
-              <rect width="1280" height="768" fill="url(#bgGrad)" rx="80"/>
-              <rect x="320" y="160" width="640" height="360" rx="88" fill="url(#blueGrad)"/>
+              <rect width="1280" height="768" fill="url(#bgGrad)"/>
 
-              <g fill="#0f172a" opacity="0.8">
+              <!-- FRONT CONTENT -->
+              <!-- Monitor body -->
+              <rect
+                x="320"
+                y="160"
+                width="640"
+                height="360"
+                rx="88"
+                fill="#1E7CFF"/>
+
+              <!-- Screen rows -->
+              <g fill="#0B1F3F">
                 <rect x="380" y="220" width="140" height="36" rx="18"/>
                 <rect x="540" y="220" width="360" height="36" rx="18"/>
+
                 <rect x="380" y="280" width="140" height="36" rx="18"/>
                 <rect x="540" y="280" width="360" height="36" rx="18"/>
+
                 <rect x="380" y="400" width="140" height="36" rx="18"/>
                 <rect x="540" y="400" width="360" height="36" rx="18"/>
               </g>
 
-              <g fill="#ef4444">
+              <!-- Active EPG row -->
+              <g fill="#FF1E1E">
                 <rect x="380" y="340" width="140" height="36" rx="18"/>
                 <rect x="540" y="340" width="360" height="36" rx="18"/>
               </g>
 
-              <rect x="600" y="520" width="80" height="84" fill="#3b82f6" rx="8"/>
-              <rect x="540" y="604" width="200" height="44" rx="22" fill="#3b82f6"/>
+              <!-- Stand -->
+              <rect x="600" y="520" width="80" height="84" fill="#1E7CFF"/>
+              <rect x="540" y="604" width="200" height="44" rx="22" fill="#1E7CFF"/>
+
             </svg>
           </div>
 
@@ -1362,12 +1389,13 @@
         </p>
       </div>
 
+      <!-- UPDATED FEATURE CARD: Removed M3U -->
       <div class="feature-card">
         <div class="feature-icon">🔑</div>
-        <h3 class="feature-title">Xtream Codes & M3U</h3>
+        <h3 class="feature-title">Xtream Codes Support</h3>
         <p class="feature-description">
-          Full support for Xtream Codes API, M3U/M3U8 playlists, and XMLTV EPG feeds. 
-          Works with any IPTV provider. No content included.
+          Full support for Xtream Codes API and XMLTV EPG feeds. 
+          Works with any IPTV provider that supports Xtream Codes. No content included.
         </p>
       </div>
 
@@ -1397,15 +1425,9 @@
           Find what you want to watch in seconds, not minutes.
         </p>
       </div>
+      
+      <!-- REMOVED ICLOUD SYNC FEATURE CARD HERE -->
 
-      <div class="feature-card">
-        <div class="feature-icon">🔄</div>
-        <h3 class="feature-title">iCloud Sync</h3>
-        <p class="feature-description">
-          Your playlists, favorites, and settings sync seamlessly across all your devices. 
-          Set it up once, enjoy everywhere.
-        </p>
-      </div>
     </div>
   </div>
 </section>
@@ -1534,7 +1556,7 @@
         <div class="platform-badge">📱 iPhone</div>
         <div class="platform-badge">📱 iPad</div>
         <div class="platform-badge">📺 Apple TV</div>
-        <div class="platform-badge">☁️ iCloud Sync</div>
+        <!-- REMOVED ICLOUD SYNC BADGE HERE -->
       </div>
     </div>
   </div>
@@ -1565,26 +1587,8 @@
           <li><a href="https://apps.apple.com/gb/app/tivepg-iptv-player-sports-hub/id6755161632">Download</a></li>
         </ul>
       </div>
-
-      <div class="footer-section">
-        <h4>Support</h4>
-        <ul class="footer-links">
-          <li><a href="#">Help Center</a></li>
-          <li><a href="#">Setup Guide</a></li>
-          <li><a href="#">FAQ</a></li>
-          <li><a href="#">Contact</a></li>
-        </ul>
-      </div>
-
-      <div class="footer-section">
-        <h4>Legal</h4>
-        <ul class="footer-links">
-          <li><a href="#">Privacy Policy</a></li>
-          <li><a href="#">Terms of Service</a></li>
-          <li><a href="#">Disclaimer</a></li>
-          <li><a href="#">Licenses</a></li>
-        </ul>
-      </div>
+      
+      <!-- REMOVED SUPPORT AND LEGAL SECTIONS -->
 
     </div>
 
