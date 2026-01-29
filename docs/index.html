@@ -765,74 +765,42 @@
       box-shadow: var(--shadow-lg);
     }
 
-    /* ================= SCREENSHOTS SECTION ================= */
-    .screenshots-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 32px;
-      margin-top: 64px;
-    }
+    <!-- ================= SCREENSHOTS SECTION ================= -->
+<section id="screenshots" class="section scroll-reveal">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-tag">Screenshots</div>
+      <h2 class="section-title">See TivEPG in action</h2>
+      <p class="section-description">
+        A glimpse into the most beautiful IPTV player on iOS. 
+        Replace these with your actual App Store screenshots.
+      </p>
+    </div>
 
-    .screenshot {
-      position: relative;
-      border-radius: 24px;
-      overflow: hidden;
-      background: var(--bg-secondary);
-      box-shadow: var(--shadow-lg);
-      transition: all 0.4s var(--ease-smooth);
-      cursor: pointer;
-    }
-
-    .screenshot::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: linear-gradient(135deg, 
-        rgba(59, 130, 246, 0.2), 
-        rgba(139, 92, 246, 0.2));
-      opacity: 0;
-      transition: opacity 0.3s var(--ease-smooth);
-      z-index: 1;
-    }
-
-    .screenshot:hover {
-      transform: translateY(-12px) scale(1.03);
-      box-shadow: var(--shadow-xl);
-    }
-
-    .screenshot:hover::before {
-      opacity: 1;
-    }
-
-    .screenshot img {
-      width: 100%;
-      height: auto;
-      display: block;
-      transition: transform 0.4s var(--ease-smooth);
-    }
-
-    .screenshot:hover img {
-      transform: scale(1.05);
-    }
-
-    .screenshot-label {
-      position: absolute;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      padding: 24px;
-      background: linear-gradient(to top, rgba(2, 6, 23, 0.95), transparent);
-      color: white;
-      font-weight: 600;
-      font-size: 1.05rem;
-      z-index: 2;
-      transform: translateY(100%);
-      transition: transform 0.3s var(--ease-smooth);
-    }
-
-    .screenshot:hover .screenshot-label {
-      transform: translateY(0);
-    }
+    <div class="screenshots-grid">
+      <div class="screenshot">
+        <img src="screenshot1.png" alt="TivEPG Timeline EPG on iPhone" />
+        <div class="screenshot-label">Timeline EPG Guide</div>
+      </div>
+      <div class="screenshot">
+        <img src="screenshot2.png" alt="TivEPG on Apple TV" />
+        <div class="screenshot-label">Apple TV Interface</div>
+      </div>
+      <div class="screenshot">
+        <img src="screenshot3.png" alt="TivEPG Sports Hub" />
+        <div class="screenshot-label">Live Sports Hub</div>
+      </div>
+      <div class="screenshot">
+        <img src="screenshot4.png" alt="TivEPG Channel Browser" />
+        <div class="screenshot-label">Channel Browser</div>
+      </div>
+      <div class="screenshot">
+        <img src="screenshot5.png" alt="TivEPG Picture-in-Picture" />
+        <div class="screenshot-label">Picture-in-Picture</div>
+      </div>
+    </div>
+  </div>
+</section>
 
     /* ================= CTA SECTION ================= */
     .cta-section {
