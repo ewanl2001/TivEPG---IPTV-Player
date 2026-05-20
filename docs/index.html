@@ -2,20 +2,20 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>TivEPG – Premium IPTV Player for iPhone & Apple TV</title>
-  <meta name="description" content="Experience the future of IPTV on iOS. TivEPG brings Sky Glass-style EPG, live sports hub, Picture-in-Picture, and seamless Apple TV integration. The most advanced IPTV player for iPhone, iPad & Apple TV.">
+  <title>TivEPG – Premium IPTV & Sports Hub</title>
+  <meta name="description" content="TivEPG IPTV & Sports Hub is a next-generation IPTV experience. Featuring interactive sports fixtures, Stremio integration, a customisable home hub, multiview, and a premium TV guide.">
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   
   <!-- OpenGraph -->
-  <meta property="og:title" content="TivEPG – Premium IPTV Player for iPhone & Apple TV" />
-  <meta property="og:description" content="The most advanced IPTV player for iOS. Sky Glass-style EPG, sports hub, Picture-in-Picture, and native Apple TV support." />
+  <meta property="og:title" content="TivEPG – Premium IPTV & Sports Hub" />
+  <meta property="og:description" content="A powerful all-in-one entertainment platform built for IPTV users who want a smarter, cleaner, and more personalised viewing experience." />
   <meta property="og:type" content="website" />
   <meta property="og:image" content="https://yourdomain.com/og-image.jpg" />
   
   <!-- Twitter Card -->
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="TivEPG – Premium IPTV Player" />
-  <meta name="twitter:description" content="The most advanced IPTV player for iOS & tvOS" />
+  <meta name="twitter:title" content="TivEPG – Premium IPTV & Sports Hub" />
+  <meta name="twitter:description" content="The most advanced IPTV player for iOS & tvOS with live sports integration." />
   
   <!-- Favicon -->
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
@@ -39,6 +39,9 @@
       
       --accent-purple: #8b5cf6;
       --accent-cyan: #06b6d4;
+      
+      --discord: #5865F2;
+      --discord-dark: #4752C4;
       
       --text-primary: #ffffff;
       --text-secondary: #e2e8f0;
@@ -394,46 +397,19 @@
       transform: translateY(-1px);
     }
 
-    .btn-secondary {
-      background: rgba(255, 255, 255, 0.05);
-      border: 1px solid var(--border-color-strong);
-      color: var(--text-primary);
-      backdrop-filter: blur(10px);
-      -webkit-backdrop-filter: blur(10px);
+    .btn-discord {
+      background: linear-gradient(135deg, var(--discord), var(--discord-dark));
+      color: white;
+      box-shadow: 0 8px 32px rgba(88, 101, 242, 0.4);
     }
 
-    .btn-secondary:hover {
-      background: rgba(255, 255, 255, 0.1);
-      border-color: rgba(255, 255, 255, 0.3);
+    .btn-discord:hover {
       transform: translateY(-3px);
+      box-shadow: 0 16px 48px rgba(88, 101, 242, 0.6);
     }
 
-    .hero-stats {
-      display: flex;
-      gap: 40px;
-      margin-top: 48px;
-      padding-top: 32px;
-      border-top: 1px solid var(--border-color);
-    }
-
-    .stat {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-
-    .stat-value {
-      font-size: 2rem;
-      font-weight: 700;
-      background: linear-gradient(135deg, var(--accent-blue), var(--accent-purple));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
-    }
-
-    .stat-label {
-      font-size: 0.9rem;
-      color: var(--text-muted);
+    .btn-discord:active {
+      transform: translateY(-1px);
     }
 
     /* ================= HERO SHOWCASE CARD ================= */
@@ -906,7 +882,6 @@
 
     .footer-grid {
       display: grid;
-      /* Adjusted grid layout to fit fewer items */
       grid-template-columns: 1.5fr 1fr;
       gap: 60px;
       margin-bottom: 60px;
@@ -1060,17 +1035,12 @@
         justify-content: center;
       }
 
-      .hero-stats {
-        justify-content: center;
-      }
-
       .comparison-grid {
         grid-template-columns: 1fr;
         gap: 60px;
       }
 
       .footer-grid {
-        /* Adjusted for responsiveness */
         grid-template-columns: 1fr;
         gap: 40px;
         text-align: center;
@@ -1113,12 +1083,6 @@
       .footer-bottom {
         flex-direction: column;
         text-align: center;
-      }
-
-      .hero-stats {
-        flex-direction: column;
-        gap: 24px;
-        align-items: center;
       }
     }
 
@@ -1205,6 +1169,7 @@
       <li><a href="#features">Features</a></li>
       <li><a href="#comparison">Why TivEPG</a></li>
       <li><a href="#screenshots">Screenshots</a></li>
+      <li><a href="https://discord.gg/CvKnmsVUdM" target="_blank">Discord</a></li>
       <li><a href="https://apps.apple.com/gb/app/tivepg-iptv-player-sports-hub/id6755161632" class="nav-cta">Download</a></li>
     </ul>
 
@@ -1220,16 +1185,15 @@
       <!-- Left: Text Content -->
       <div class="hero-text">
         <div class="badge">
-          📺 Premium IPTV Player for iOS & tvOS
+          📺 Next-Generation IPTV & Sports Hub
         </div>
         
         <h1>
-          The <span class="highlight">ultimate IPTV</span> experience on iPhone & Apple TV
+          The <span class="highlight">ultimate entertainment</span> experience on iPhone & Apple TV
         </h1>
         
         <p class="hero-description">
-          TivEPG brings you a Sky Glass–inspired EPG, live sports hub, instant Picture-in-Picture, 
-          and seamless Apple TV integration. Experience IPTV the way it should be — fast, beautiful, and effortless.
+          TivEPG is a powerful all-in-one entertainment platform built for IPTV users who want a smarter, cleaner, and more personalised viewing experience. Featuring interactive sports fixtures, automatic channel discovery, Stremio integration, and a premium TV guide.
         </p>
         
         <div class="cta-group">
@@ -1237,24 +1201,9 @@
             <span>Download on App Store</span>
             <span>→</span>
           </a>
-          <a href="#features" class="btn btn-secondary">
-            <span>Explore Features</span>
+          <a href="https://discord.gg/CvKnmsVUdM" target="_blank" class="btn btn-discord">
+            <span>Join our Discord</span>
           </a>
-        </div>
-
-        <div class="hero-stats">
-          <div class="stat">
-            <div class="stat-value">4.8★</div>
-            <div class="stat-label">App Store Rating</div>
-          </div>
-          <div class="stat">
-            <div class="stat-value">50K+</div>
-            <div class="stat-label">Active Users</div>
-          </div>
-          <div class="stat">
-            <div class="stat-value">iOS 15+</div>
-            <div class="stat-label">Compatibility</div>
-          </div>
         </div>
       </div>
 
@@ -1345,88 +1294,69 @@
   <div class="container">
     <div class="section-header">
       <div class="section-tag">Features</div>
-      <h2 class="section-title">Everything you need in an IPTV player</h2>
+      <h2 class="section-title">Everything you need in an IPTV platform</h2>
       <p class="section-description">
-        TivEPG isn't just another IPTV app. It's a complete entertainment system built from the ground up 
-        for iOS and tvOS, with features that put other players to shame.
+        TivEPG goes far beyond a standard IPTV player by combining advanced live TV management, 
+        sports discovery, media integration, and deep customisation into one seamless hub.
       </p>
     </div>
 
     <div class="features-grid">
       <div class="feature-card">
-        <div class="feature-icon">📡</div>
-        <h3 class="feature-title">Advanced Timeline EPG</h3>
-        <p class="feature-description">
-          Sky Glass–style horizontal guide with buttery-smooth scrolling, category filters, 
-          rich program metadata, and instant navigation. See what's on now and what's coming up.
-        </p>
-      </div>
-
-      <div class="feature-card">
         <div class="feature-icon">⚽</div>
-        <h3 class="feature-title">Built-in Sports Hub</h3>
+        <h3 class="feature-title">Interactive Sports Fixtures</h3>
         <p class="feature-description">
-          Live scores, in-play statistics, fixtures, league tables, and post-match analysis — 
-          all integrated seamlessly into your IPTV experience.
+          Follow global sporting events with built-in interactive fixtures. Select a match and TivEPG will automatically search your playlist to find the official broadcast channels, getting you into the action instantly.
         </p>
       </div>
 
       <div class="feature-card">
-        <div class="feature-icon">📱</div>
-        <h3 class="feature-title">Picture-in-Picture</h3>
+        <div class="feature-icon">🎬</div>
+        <h3 class="feature-title">Stremio Integration</h3>
         <p class="feature-description">
-          Keep watching while you browse channels, check the EPG, or use other apps on iPhone and iPad. 
-          True multitasking for your content.
+          Centralise your media experience. With support for Stremio add-ons, including Trakt, you can connect the content and services you already use for a unified setup across live TV, movies, and VOD.
         </p>
       </div>
 
       <div class="feature-card">
-        <div class="feature-icon">📺</div>
-        <h3 class="feature-title">Native Apple TV</h3>
+        <div class="feature-icon">🏠</div>
+        <h3 class="feature-title">Fully Customisable Home Hub</h3>
         <p class="feature-description">
-          Designed specifically for the Siri Remote with smooth focus navigation, 
-          instant channel switching, and a beautiful big-screen interface.
-        </p>
-      </div>
-
-      <!-- UPDATED FEATURE CARD: Removed M3U -->
-      <div class="feature-card">
-        <div class="feature-icon">🔑</div>
-        <h3 class="feature-title">Xtream Codes Support</h3>
-        <p class="feature-description">
-          Full support for Xtream Codes API and XMLTV EPG feeds. 
-          Works with any IPTV provider that supports Xtream Codes. No content included.
+          Create a home screen that works for you. Add the exact content rows you want—including sports leagues, live TV categories, and VOD—giving you control and removing standard IPTV bloat.
         </p>
       </div>
 
       <div class="feature-card">
-        <div class="feature-icon">⚡</div>
-        <h3 class="feature-title">Lightning Fast</h3>
+        <div class="feature-icon">📡</div>
+        <h3 class="feature-title">Premium TV Guide</h3>
         <p class="feature-description">
-          Optimized native Swift code ensures instant channel switching, smooth scrolling, 
-          and zero lag. Plus: no ads, no tracking, complete privacy.
+          Enjoy a sleek, modern TV guide with powerful organisation features. Reorder categories and channels, pin what matters, and easily structure your content so your favourites are always within reach.
         </p>
       </div>
 
       <div class="feature-card">
-        <div class="feature-icon">🎨</div>
-        <h3 class="feature-title">Beautiful Design</h3>
+        <div class="feature-icon">🪟</div>
+        <h3 class="feature-title">Multiview</h3>
         <p class="feature-description">
-          Meticulously crafted UI that feels right at home on iOS. 
-          Dark mode, light mode, and adaptive layouts for all Apple devices.
+          Watch multiple channels at the same time with the built-in multiview feature. Perfect for busy sports schedules, breaking news, or keeping an eye on several live events at once.
         </p>
       </div>
 
       <div class="feature-card">
-        <div class="feature-icon">📂</div>
-        <h3 class="feature-title">Smart Organization</h3>
+        <div class="feature-icon">📊</div>
+        <h3 class="feature-title">Live Match Stats</h3>
         <p class="feature-description">
-          Custom favorites, category filtering, search, and channel grouping. 
-          Find what you want to watch in seconds, not minutes.
+          For selected sports leagues, TivEPG includes in-app live match statistics. Stats are intentionally embargoed by 2 minutes to protect your live viewing experience from unexpected spoilers.
         </p>
       </div>
-      
-      <!-- REMOVED ICLOUD SYNC FEATURE CARD HERE -->
+
+      <div class="feature-card">
+        <div class="feature-icon">💬</div>
+        <h3 class="feature-title">Community & Updates</h3>
+        <p class="feature-description">
+          TivEPG is actively supported with monthly updates, bringing new features and continued refinement. Join our dedicated Discord community for support, feedback, and announcements.
+        </p>
+      </div>
 
     </div>
   </div>
@@ -1441,44 +1371,44 @@
         <div class="section-tag">Why Choose TivEPG</div>
         <h2 class="section-title">Leave clunky IPTV apps behind</h2>
         <p class="section-description">
-          Most IPTV players on iOS are poorly designed, slow, and frustrating to use. 
-          TivEPG was built to be the player you actually enjoy using.
+          Most IPTV players are poorly designed, slow, and frustrating. 
+          TivEPG was built to be the unified entertainment hub you actually enjoy using.
         </p>
 
         <ul class="comparison-list">
           <li class="comparison-item">
             <div class="comparison-check">✓</div>
             <div class="comparison-text">
-              <strong>Better EPG than IPTV Smarters</strong>
-              <span>Sky Glass–style timeline vs basic grid layout</span>
+              <strong>Automatic Channel Discovery</strong>
+              <span>Interactive sports fixtures find the channels you need instantly</span>
             </div>
           </li>
           <li class="comparison-item">
             <div class="comparison-check">✓</div>
             <div class="comparison-text">
-              <strong>Cleaner than IPTV Extreme</strong>
-              <span>Modern Apple design vs cluttered interface</span>
+              <strong>Unified Media Experience</strong>
+              <span>Seamlessly integrates with Stremio and Trakt</span>
             </div>
           </li>
           <li class="comparison-item">
             <div class="comparison-check">✓</div>
             <div class="comparison-text">
-              <strong>Faster than GSE Smart IPTV</strong>
-              <span>Native Swift performance vs laggy UI</span>
+              <strong>Remove the Bloat</strong>
+              <span>A fully customisable home hub shows only what you want to see</span>
             </div>
           </li>
           <li class="comparison-item">
             <div class="comparison-check">✓</div>
             <div class="comparison-text">
-              <strong>Sports hub built-in</strong>
-              <span>No other IPTV player has integrated live scores</span>
+              <strong>Watch Multiple Events</strong>
+              <span>Built-in Multiview capability for power users</span>
             </div>
           </li>
           <li class="comparison-item">
             <div class="comparison-check">✓</div>
             <div class="comparison-text">
-              <strong>Best Apple TV experience</strong>
-              <span>Designed for Siri Remote from day one</span>
+              <strong>Spoiler-free Live Stats</strong>
+              <span>In-app match stats embargoed by 2 minutes</span>
             </div>
           </li>
         </ul>
@@ -1486,15 +1416,12 @@
 
       <div class="comparison-image">
         <div class="glass-box">
-          <h3>Built for IPTV providers & power users</h3>
+          <h3>Built for true sports & media fans</h3>
           <p>
-            Whether you're an IPTV provider recommending an app to your customers, 
-            or a power user who demands the best, TivEPG delivers professional-grade 
-            performance and stability.
+            Whether you're tracking live fixtures across the globe, organising a massive VOD collection, or managing complex live TV playlists, TivEPG provides the tools to do it elegantly.
           </p>
           <p style="margin-top: 16px;">
-            <strong>Full Xtream Codes API support</strong> means your customers get 
-            instant access to live TV, VOD, series, and catch-up — all with zero configuration hassle.
+            With features like category and channel reordering, custom home rows, and <strong>Xtream Codes API support</strong>, you get instant access to your content—structured exactly how you want it.
           </p>
           <p style="margin-top: 16px; color: var(--text-muted); font-size: 0.9rem;">
             TivEPG is a player only. No content, streams, or subscriptions are included or provided.
@@ -1513,31 +1440,30 @@
       <div class="section-tag">Screenshots</div>
       <h2 class="section-title">See TivEPG in action</h2>
       <p class="section-description">
-        A glimpse into the most beautiful IPTV player on iOS. 
-        Replace these with your actual App Store screenshots.
+        A glimpse into the most beautiful IPTV and Sports Hub on iOS.
       </p>
     </div>
 
     <div class="screenshots-grid">
       <div class="screenshot">
-        <img src="IMG_0205%202.PNG" alt="TivEPG Screenshot 1" />
+        <img src="IMG_0205%202.PNG" alt="Browse Global Sports Leagues" />
         <div class="screenshot-label">Browse Global Sports Leagues</div>
       </div>
       <div class="screenshot">
-        <img src="IMG_0208%202.PNG" alt="TivEPG Screenshot 2" />
-        <div class="screenshot-label">Fixture View with in play stats and auto channel matching</div>
+        <img src="IMG_0208%202.PNG" alt="Fixture View with in play stats" />
+        <div class="screenshot-label">Fixture View with in-play stats & auto match</div>
       </div>
       <div class="screenshot">
-        <img src="IMG_0210.PNG" alt="TivEPG Screenshot 3" />
-        <div class="screenshot-label">Stunning EPG</div>
+        <img src="IMG_0210.PNG" alt="Stunning Premium EPG" />
+        <div class="screenshot-label">Stunning Premium EPG</div>
       </div>
       <div class="screenshot">
-        <img src="IMG_0212.PNG" alt="TivEPG Screenshot 4" />
-        <div class="screenshot-label">Easy to Navigate</div>
+        <img src="IMG_0212.PNG" alt="Customisable Home Hub" />
+        <div class="screenshot-label">Customisable Home Hub</div>
       </div>
       <div class="screenshot">
-        <img src="Screenshot%202026-01-13%20at%2019.14.45.png" alt="TivEPG Screenshot 5" />
-        <div class="screenshot-label">Stunning EPG</div>
+        <img src="Screenshot%202026-01-13%20at%2019.14.45.png" alt="Seamless Media Integration" />
+        <div class="screenshot-label">Seamless Media Integration</div>
       </div>
     </div>
   </div>
@@ -1547,16 +1473,18 @@
 <section class="cta-section scroll-reveal">
   <div class="container">
     <div class="cta-content">
-      <h2 class="section-title">Ready to upgrade your IPTV experience?</h2>
+      <h2 class="section-title">Ready to upgrade your viewing experience?</h2>
       <p class="section-description">
-        Join thousands of users who've already made the switch to the most advanced 
-        IPTV player on iOS. Download TivEPG today and see the difference.
+        TivEPG gives you a faster, smarter, and more personalised way to enjoy live TV, sport, movies, and VOD — all in one place. Download today and join our community.
       </p>
       
-      <div class="cta-group" style="justify-content: center;">
+      <div class="cta-group" style="justify-content: center; gap: 20px;">
         <a href="https://apps.apple.com/gb/app/tivepg-iptv-player-sports-hub/id6755161632" class="btn btn-primary" style="font-size: 1.1rem; padding: 18px 40px;">
           <span>Download on the App Store</span>
           <span>→</span>
+        </a>
+        <a href="https://discord.gg/CvKnmsVUdM" target="_blank" class="btn btn-discord" style="font-size: 1.1rem; padding: 18px 40px;">
+          <span>Join the Discord</span>
         </a>
       </div>
 
@@ -1564,7 +1492,6 @@
         <div class="platform-badge">📱 iPhone</div>
         <div class="platform-badge">📱 iPad</div>
         <div class="platform-badge">📺 Apple TV</div>
-        <!-- REMOVED ICLOUD SYNC BADGE HERE -->
       </div>
     </div>
   </div>
@@ -1581,32 +1508,30 @@
           <span>TivEPG</span>
         </a>
         <p class="footer-description">
-          The most advanced IPTV player for iPhone, iPad, and Apple TV. 
-          Beautiful design, powerful features, seamless experience.
+          The ultimate IPTV and Sports Hub platform for iPhone, iPad, and Apple TV. 
+          Unmatched features, customisation, and continuous updates.
         </p>
       </div>
 
       <div class="footer-section">
-        <h4>Product</h4>
+        <h4>Product & Community</h4>
         <ul class="footer-links">
           <li><a href="#features">Features</a></li>
           <li><a href="#comparison">Why TivEPG</a></li>
-          <li><a href="#screenshots">Screenshots</a></li>
-          <li><a href="https://apps.apple.com/gb/app/tivepg-iptv-player-sports-hub/id6755161632">Download</a></li>
+          <li><a href="https://discord.gg/CvKnmsVUdM" target="_blank">Discord Community</a></li>
+          <li><a href="https://apps.apple.com/gb/app/tivepg-iptv-player-sports-hub/id6755161632">Download App</a></li>
         </ul>
       </div>
-      
-      <!-- REMOVED SUPPORT AND LEGAL SECTIONS -->
 
     </div>
 
     <div class="footer-bottom">
-      <p>© 2026 TivEPG. All rights reserved. IPTV Player for iOS & tvOS. No content included.</p>
+      <p>© 2026 TivEPG. All rights reserved. IPTV Player & Media Hub. No content included.</p>
       
       <div class="social-links">
+        <a href="https://discord.gg/CvKnmsVUdM" target="_blank" class="social-link" aria-label="Discord">💬</a>
         <a href="#" class="social-link" aria-label="Twitter">𝕏</a>
         <a href="#" class="social-link" aria-label="GitHub">⚙</a>
-        <a href="#" class="social-link" aria-label="Reddit">R</a>
       </div>
     </div>
   </div>
@@ -1689,8 +1614,8 @@
   const mobileMenuBtn = document.getElementById('mobileMenuBtn');
   
   mobileMenuBtn.addEventListener('click', () => {
-    // Add your mobile menu logic here
-    alert('Mobile menu - implement dropdown or slide-in menu based on your preference');
+    // Basic interaction for mobile nav, you can expand this if you add a sliding menu later
+    alert('Navigation is simple right now, scroll down or use the links below!');
   });
 </script>
 
