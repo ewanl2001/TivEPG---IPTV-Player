@@ -547,6 +547,91 @@
       }
     }
 
+    /* ================= BRAND LOGO IMAGE ================= */
+    .nav-logo-img {
+      width: 46px;
+      height: auto;
+      border-radius: 9px;
+      display: block;
+      box-shadow: var(--glow-blue);
+    }
+
+    .footer-logo-img {
+      width: 46px;
+      height: auto;
+      border-radius: 9px;
+      display: block;
+    }
+
+    /* ================= HERO SCREENSHOT SHOWCASE ================= */
+    .showcase-stage {
+      position: relative;
+      padding: 0 4% 14% 0;
+      animation: fade-in-up 0.8s var(--ease-smooth) 0.4s backwards;
+    }
+
+    .showcase-frame {
+      border-radius: 22px;
+      overflow: hidden;
+      background: var(--bg-secondary);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      box-shadow: var(--shadow-xl), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+    }
+
+    .showcase-frame img {
+      width: 100%;
+      height: auto;
+      display: block;
+    }
+
+    .showcase-frame-main {
+      position: relative;
+      transition: transform 0.5s var(--ease-smooth);
+    }
+
+    .showcase-frame-main:hover {
+      transform: translateY(-8px);
+    }
+
+    .showcase-frame-float {
+      position: absolute;
+      right: -4%;
+      bottom: 0;
+      width: 54%;
+      border-color: rgba(255, 255, 255, 0.25);
+      box-shadow: var(--shadow-xl), var(--glow-blue);
+      animation: logo-float 6s ease-in-out infinite;
+    }
+
+    .showcase-badge {
+      position: absolute;
+      top: 14px;
+      left: 14px;
+      z-index: 2;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 15px;
+      border-radius: 100px;
+      background: rgba(2, 6, 23, 0.72);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      font-size: 0.8rem;
+      font-weight: 700;
+      letter-spacing: 0.05em;
+      color: var(--text-primary);
+    }
+
+    .live-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent-red);
+      box-shadow: 0 0 12px var(--accent-red);
+      animation: pulse-live 2s ease-in-out infinite;
+    }
+
     /* ================= FEATURES SECTION ================= */
     .section {
       padding: 120px 0;
@@ -1080,6 +1165,18 @@
         grid-template-columns: 1fr;
       }
 
+      .showcase-stage {
+        padding: 0;
+      }
+
+      .showcase-frame-float {
+        position: static;
+        width: 78%;
+        right: auto;
+        bottom: auto;
+        margin: 18px auto 0;
+      }
+
       .footer-bottom {
         flex-direction: column;
         text-align: center;
@@ -1161,7 +1258,30 @@
 <nav class="nav" id="nav">
   <div class="nav-container">
     <a href="#" class="nav-logo">
-      <div class="nav-logo-icon">📺</div>
+      <svg class="nav-logo-img" viewBox="0 0 1280 768" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <defs>
+          <linearGradient id="bgGradNav" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#0A1E44"/>
+            <stop offset="100%" stop-color="#071634"/>
+          </linearGradient>
+        </defs>
+        <rect width="1280" height="768" fill="url(#bgGradNav)"/>
+        <rect x="320" y="160" width="640" height="360" rx="88" fill="#1E7CFF"/>
+        <g fill="#0B1F3F">
+          <rect x="380" y="220" width="140" height="36" rx="18"/>
+          <rect x="540" y="220" width="360" height="36" rx="18"/>
+          <rect x="380" y="280" width="140" height="36" rx="18"/>
+          <rect x="540" y="280" width="360" height="36" rx="18"/>
+          <rect x="380" y="400" width="140" height="36" rx="18"/>
+          <rect x="540" y="400" width="360" height="36" rx="18"/>
+        </g>
+        <g fill="#FF1E1E">
+          <rect x="380" y="340" width="140" height="36" rx="18"/>
+          <rect x="540" y="340" width="360" height="36" rx="18"/>
+        </g>
+        <rect x="600" y="520" width="80" height="84" fill="#1E7CFF"/>
+        <rect x="540" y="604" width="200" height="44" rx="22" fill="#1E7CFF"/>
+      </svg>
       <span>TivEPG</span>
     </a>
     
@@ -1207,80 +1327,15 @@
         </div>
       </div>
 
-      <!-- Right: Showcase Card -->
+      <!-- Right: Live App Screenshots -->
       <div class="hero-showcase">
-        <div class="showcase-card">
-          <div class="showcase-logo">
-            <!-- REPLACED LOGO SVG HERE -->
-            <svg
-              class="app-logo"
-              width="1280"
-              height="768"
-              viewBox="0 0 1280 768"
-              xmlns="http://www.w3.org/2000/svg"
-              shape-rendering="geometricPrecision"
-              text-rendering="geometricPrecision">
-
-              <!-- BACK LAYER (solid background) -->
-              <defs>
-                <linearGradient id="bgGrad" x1="0" y1="0" x2="1" y2="1">
-                  <stop offset="0%" stop-color="#0A1E44"/>
-                  <stop offset="100%" stop-color="#071634"/>
-                </linearGradient>
-              </defs>
-
-              <rect width="1280" height="768" fill="url(#bgGrad)"/>
-
-              <!-- FRONT CONTENT -->
-              <!-- Monitor body -->
-              <rect
-                x="320"
-                y="160"
-                width="640"
-                height="360"
-                rx="88"
-                fill="#1E7CFF"/>
-
-              <!-- Screen rows -->
-              <g fill="#0B1F3F">
-                <rect x="380" y="220" width="140" height="36" rx="18"/>
-                <rect x="540" y="220" width="360" height="36" rx="18"/>
-
-                <rect x="380" y="280" width="140" height="36" rx="18"/>
-                <rect x="540" y="280" width="360" height="36" rx="18"/>
-
-                <rect x="380" y="400" width="140" height="36" rx="18"/>
-                <rect x="540" y="400" width="360" height="36" rx="18"/>
-              </g>
-
-              <!-- Active EPG row -->
-              <g fill="#FF1E1E">
-                <rect x="380" y="340" width="140" height="36" rx="18"/>
-                <rect x="540" y="340" width="360" height="36" rx="18"/>
-              </g>
-
-              <!-- Stand -->
-              <rect x="600" y="520" width="80" height="84" fill="#1E7CFF"/>
-              <rect x="540" y="604" width="200" height="44" rx="22" fill="#1E7CFF"/>
-
-            </svg>
+        <div class="showcase-stage">
+          <div class="showcase-frame showcase-frame-main">
+            <div class="showcase-badge"><span class="live-dot"></span> LIVE EPG</div>
+            <img src="epg-guide.png" alt="TivEPG premium live TV guide showing BBC One, ITV and a full EPG timeline" />
           </div>
-
-          <div class="showcase-title">Live EPG Preview</div>
-
-          <div class="epg-preview">
-            <div class="epg-row">
-              <div class="epg-time"></div>
-              <div class="epg-program"></div>
-            </div>
-            <div class="epg-row">
-              <div class="epg-time"></div>
-              <div class="epg-program live"></div>
-            </div>
-            <div class="epg-row">
-              <div class="epg-time"></div>
-              <div class="epg-program"></div>
-            </div>
+          <div class="showcase-frame showcase-frame-float">
+            <img src="sports-fixture.png" alt="TivEPG interactive sports fixture with automatic broadcaster discovery" />
           </div>
         </div>
       </div>
@@ -1504,7 +1559,30 @@
       
       <div class="footer-brand">
         <a href="#" class="footer-logo">
-          <div class="nav-logo-icon">📺</div>
+          <svg class="footer-logo-img" viewBox="0 0 1280 768" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <defs>
+              <linearGradient id="bgGradFooter" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stop-color="#0A1E44"/>
+                <stop offset="100%" stop-color="#071634"/>
+              </linearGradient>
+            </defs>
+            <rect width="1280" height="768" fill="url(#bgGradFooter)"/>
+            <rect x="320" y="160" width="640" height="360" rx="88" fill="#1E7CFF"/>
+            <g fill="#0B1F3F">
+              <rect x="380" y="220" width="140" height="36" rx="18"/>
+              <rect x="540" y="220" width="360" height="36" rx="18"/>
+              <rect x="380" y="280" width="140" height="36" rx="18"/>
+              <rect x="540" y="280" width="360" height="36" rx="18"/>
+              <rect x="380" y="400" width="140" height="36" rx="18"/>
+              <rect x="540" y="400" width="360" height="36" rx="18"/>
+            </g>
+            <g fill="#FF1E1E">
+              <rect x="380" y="340" width="140" height="36" rx="18"/>
+              <rect x="540" y="340" width="360" height="36" rx="18"/>
+            </g>
+            <rect x="600" y="520" width="80" height="84" fill="#1E7CFF"/>
+            <rect x="540" y="604" width="200" height="44" rx="22" fill="#1E7CFF"/>
+          </svg>
           <span>TivEPG</span>
         </a>
         <p class="footer-description">
@@ -1621,3 +1699,4 @@
 
 </body>
 </html>
+ 
