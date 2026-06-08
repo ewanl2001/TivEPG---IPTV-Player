@@ -281,6 +281,12 @@
       box-shadow: 0 8px 24px rgba(59, 130, 246, 0.5);
     }
 
+    .nav-cta-mobile {
+      display: none;
+      padding: 8px 18px;
+      font-size: 0.9rem;
+    }
+
     .mobile-menu-btn {
       display: none;
       background: none;
@@ -301,10 +307,29 @@
     }
 
     .hero-content {
-      display: grid;
-      grid-template-columns: 1.1fr 0.9fr;
-      gap: 80px;
+      display: flex;
+      flex-direction: column;
       align-items: center;
+      gap: 48px;
+    }
+
+    .hero-title {
+      text-align: center;
+      max-width: 900px;
+      animation: fade-in-up 0.8s var(--ease-smooth) 0.1s backwards;
+    }
+
+    .hero-title h1 {
+      margin-bottom: 0;
+    }
+
+    .hero-text-bottom {
+      text-align: center;
+      max-width: 700px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      animation: fade-in-up 0.8s var(--ease-smooth) 0.3s backwards;
     }
 
     .hero-text {
@@ -1100,13 +1125,8 @@
     /* ================= RESPONSIVE ================= */
     @media (max-width: 1024px) {
       .hero-content {
-        grid-template-columns: 1fr;
         gap: 60px;
         text-align: center;
-      }
-
-      .hero-showcase {
-        order: -1;
       }
 
       .hero-description {
@@ -1145,6 +1165,10 @@
 
       .mobile-menu-btn {
         display: block;
+      }
+
+      .nav-cta-mobile {
+        display: inline-flex;
       }
 
       .hero {
@@ -1283,6 +1307,8 @@
       <li><a href="https://apps.apple.com/gb/app/tivepg-iptv-player-sports-hub/id6755161632" class="nav-cta">Download</a></li>
     </ul>
 
+    <a href="https://apps.apple.com/gb/app/tivepg-iptv-player-sports-hub/id6755161632" class="nav-cta nav-cta-mobile">Download</a>
+
     <button class="mobile-menu-btn" id="mobileMenuBtn">☰</button>
   </div>
 </nav>
@@ -1291,33 +1317,15 @@
 <section class="hero">
   <div class="container">
     <div class="hero-content">
-      
-      <!-- Left: Text Content -->
-      <div class="hero-text">
-        <div class="badge">
-          📺 Next-Generation IPTV & Sports Hub
-        </div>
-        
+
+      <!-- Top: Headline -->
+      <div class="hero-title">
         <h1>
           Bringing <span class="highlight">IPTV, Sports Hub & Stremio</span> to all your Apple devices
         </h1>
-        
-        <p class="hero-description">
-          TivEPG is a powerful all-in-one entertainment platform built for IPTV users who want a smarter, cleaner, and more personalised viewing experience. Featuring interactive sports fixtures, automatic channel discovery, Stremio integration, and a premium TV guide.
-        </p>
-        
-        <div class="cta-group">
-          <a href="https://apps.apple.com/gb/app/tivepg-iptv-player-sports-hub/id6755161632" class="btn btn-primary">
-            <span>Download on App Store</span>
-            <span>→</span>
-          </a>
-          <a href="https://discord.gg/CvKnmsVUdM" target="_blank" class="btn btn-discord">
-            <span>Join our Discord</span>
-          </a>
-        </div>
       </div>
 
-      <!-- Right: Live App Screenshots -->
+      <!-- Live App Screenshots -->
       <div class="hero-showcase">
         <div class="showcase-stage">
           <div class="showcase-frame">
@@ -1338,6 +1346,27 @@
             <div class="showcase-badge">🏠 Fully customisable home hub</div>
             <img src="Screenshot 2026-06-08 at 19.26.23.png" alt="TivEPG fully customisable home hub showing personalised content rows" />
           </div>
+        </div>
+      </div>
+
+      <!-- Bottom: Supporting Text & CTAs -->
+      <div class="hero-text-bottom">
+        <div class="badge">
+          📺 Next-Generation IPTV & Sports Hub
+        </div>
+
+        <p class="hero-description">
+          TivEPG is a powerful all-in-one entertainment platform built for IPTV users who want a smarter, cleaner, and more personalised viewing experience. Featuring interactive sports fixtures, automatic channel discovery, Stremio integration, and a premium TV guide.
+        </p>
+
+        <div class="cta-group" style="justify-content: center;">
+          <a href="https://apps.apple.com/gb/app/tivepg-iptv-player-sports-hub/id6755161632" class="btn btn-primary">
+            <span>Download on App Store</span>
+            <span>→</span>
+          </a>
+          <a href="https://discord.gg/CvKnmsVUdM" target="_blank" class="btn btn-discord">
+            <span>Join our Discord</span>
+          </a>
         </div>
       </div>
 
@@ -1700,5 +1729,6 @@
 
 </body>
 </html>
+ 
  
  
