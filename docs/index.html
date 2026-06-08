@@ -565,17 +565,24 @@
 
     /* ================= HERO SCREENSHOT SHOWCASE ================= */
     .showcase-stage {
-      position: relative;
-      padding: 0 4% 14% 0;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
       animation: fade-in-up 0.8s var(--ease-smooth) 0.4s backwards;
     }
 
     .showcase-frame {
+      position: relative;
       border-radius: 22px;
       overflow: hidden;
       background: var(--bg-secondary);
       border: 1px solid rgba(255, 255, 255, 0.15);
       box-shadow: var(--shadow-xl), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+      transition: transform 0.5s var(--ease-smooth);
+    }
+
+    .showcase-frame:hover {
+      transform: translateY(-8px);
     }
 
     .showcase-frame img {
@@ -584,23 +591,10 @@
       display: block;
     }
 
-    .showcase-frame-main {
-      position: relative;
-      transition: transform 0.5s var(--ease-smooth);
-    }
-
-    .showcase-frame-main:hover {
-      transform: translateY(-8px);
-    }
-
-    .showcase-frame-float {
-      position: absolute;
-      right: -4%;
-      bottom: 0;
-      width: 54%;
-      border-color: rgba(255, 255, 255, 0.25);
-      box-shadow: var(--shadow-xl), var(--glow-blue);
-      animation: logo-float 6s ease-in-out infinite;
+    .showcase-duo {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
     }
 
     .showcase-badge {
@@ -1111,6 +1105,10 @@
         text-align: center;
       }
 
+      .hero-showcase {
+        order: -1;
+      }
+
       .hero-description {
         margin-left: auto;
         margin-right: auto;
@@ -1165,16 +1163,8 @@
         grid-template-columns: 1fr;
       }
 
-      .showcase-stage {
-        padding: 0;
-      }
-
-      .showcase-frame-float {
-        position: static;
-        width: 78%;
-        right: auto;
-        bottom: auto;
-        margin: 18px auto 0;
+      .showcase-duo {
+        grid-template-columns: 1fr;
       }
 
       .footer-bottom {
@@ -1330,12 +1320,19 @@
       <!-- Right: Live App Screenshots -->
       <div class="hero-showcase">
         <div class="showcase-stage">
-          <div class="showcase-frame showcase-frame-main">
+          <div class="showcase-frame">
             <div class="showcase-badge"><span class="live-dot"></span> LIVE EPG</div>
-            <img src="Screenshot 2026-06-08 at 18.29.28.png" alt="TivEPG premium live TV guide showing BBC One, ITV and a full EPG timeline" />
+            <img src="epg-guide.png" alt="TivEPG premium live TV guide showing BBC One, ITV and a full EPG timeline" />
           </div>
-          <div class="showcase-frame showcase-frame-float">
-            <img src="sports-fixture.png" alt="TivEPG interactive sports fixture with automatic broadcaster discovery" />
+          <div class="showcase-duo">
+            <div class="showcase-frame">
+              <div class="showcase-badge">⚽ Finds Official Broadcasters & Live Stats</div>
+              <img src="sports-fixture.png" alt="TivEPG interactive sports fixture that automatically finds the official broadcaster and shows live match stats" />
+            </div>
+            <div class="showcase-frame">
+              <div class="showcase-badge">🏆 Sports Hub</div>
+              <img src="sports-hub-fixtures.png" alt="TivEPG Sports Hub showing upcoming FIFA World Cup fixtures with kick-off times" />
+            </div>
           </div>
         </div>
       </div>
