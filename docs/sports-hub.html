@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Sports Hub: live scores, stats and Replay beside the game | TivEPG</title>
+  <meta name="description" content="The TivEPG Sports Hub: every fixture and score, the channel showing it, SportsHub Live stats and tables beside the picture, Replay of every goal from your catch-up, highlights and full-match replays. Football, cricket, NFL, NBA, F1, tennis, golf and more." />
+  <link rel="canonical" href="https://tivepg.com/sports-hub.html" />
+  <meta name="theme-color" content="#0A0E15" />
+  <meta name="apple-itunes-app" content="app-id=6755161632" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="TivEPG" />
+  <meta property="og:url" content="https://tivepg.com/sports-hub.html" />
+  <meta property="og:title" content="TivEPG Sports Hub: the whole matchday, beside the game" />
+  <meta property="og:description" content="Live stats, live tables, every other score and Replay of every goal, without leaving the channel you're watching." />
+  <meta property="og:image" content="https://tivepg.com/og-image.jpg" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <link rel="icon" type="image/png" href="favicon.png" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-1RVT0SKV1F"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+    gtag('config', 'G-1RVT0SKV1F');
+  </script>
+
+  <link rel="stylesheet" href="site.css" />
+  <style>
+    .nav-links a.current { color: var(--text); }
+
+    /* Hero */
+    .sh-hero { position: relative; padding: 150px 0 40px; text-align: center; overflow: hidden; }
+    .sh-hero::before { content: ""; position: absolute; inset: -20% -10% auto; height: 900px; pointer-events: none;
+      background: radial-gradient(50% 50% at 50% 0%, rgba(229,72,77,.16), transparent 70%); }
+    .sh-hero .wrap { position: relative; }
+    .sh-hero .lede { margin: 22px auto 0; }
+    .sh-hero-art { position: relative; max-width: 1100px; margin: 64px auto 0; padding: 0 24px; }
+    .sh-hero-art img { width: 100%; border-radius: 18px; border: 1px solid var(--line); box-shadow: 0 40px 100px rgba(0,0,0,.6); }
+
+    /* Chapter strip */
+    .chapters { position: sticky; top: 64px; z-index: 40; margin-top: 64px; background: rgba(10,14,21,.82); border-block: 1px solid var(--line);
+      backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px); }
+    .chapters ul { list-style: none; display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; max-width: var(--max); margin: 0 auto; padding: 10px 24px; }
+    .chapters ul::-webkit-scrollbar { display: none; }
+    .chapters a { display: block; white-space: nowrap; padding: 8px 14px; border-radius: 999px; font-size: 14px; font-weight: 600; color: var(--text-2); transition: color .2s, background .2s; }
+    .chapters a:hover { color: var(--text); }
+    .chapters a.active { background: #fff; color: #0A0E15; }
+
+    /* Feature chapters */
+    .chapter { padding: 130px 0 0; scroll-margin-top: 90px; }
+    .chapter-head { max-width: 760px; }
+    .chapter-head .headline { margin-top: 14px; }
+    .chapter-head .lede { margin-top: 18px; }
+    .chapter.center .chapter-head { margin: 0 auto; text-align: center; }
+    .chapter.center .chapter-head .lede { margin-left: auto; margin-right: auto; }
+
+    .feature { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 64px; align-items: center; margin-top: 64px; }
+    .feature.flip > :first-child { order: 2; }
+    .feature h3 { font-size: clamp(24px, 2.6vw, 32px); font-weight: 800; letter-spacing: -0.025em; line-height: 1.12; }
+    .feature h3 em { font-style: normal; color: var(--red); }
+    .feature > div > p { margin-top: 14px; color: var(--text-2); font-size: 17px; }
+    .facts { list-style: none; margin-top: 22px; display: grid; gap: 12px; }
+    .facts li { position: relative; padding-left: 22px; color: var(--text-2); font-size: 16px; }
+    .facts li::before { content: ""; position: absolute; left: 2px; top: .62em; width: 7px; height: 7px; border-radius: 50%; background: var(--blue); }
+    .facts b { color: var(--text); font-weight: 600; }
+
+    /* Media */
+    .media { position: relative; display: grid; gap: 16px; }
+    .media.pair { grid-template-columns: 1fr 1fr; align-items: end; }
+    .media figure { border-radius: 18px; overflow: hidden; border: 1px solid var(--line); background: var(--card); cursor: zoom-in; box-shadow: 0 30px 80px rgba(0,0,0,.45); }
+    .media img { width: 100%; height: auto; }
+    .media .portrait { max-width: 320px; justify-self: center; }
+    .media.pair .portrait { max-width: none; }
+    .media figcaption { padding: 10px 14px; font-size: 13px; color: var(--text-3); border-top: 1px solid var(--line); }
+
+    /* Screenshot slots: show the image when it exists, a labelled placeholder until then */
+    .slot { position: relative; }
+    .slot.missing { cursor: default; display: grid; place-items: center; text-align: center; min-height: 260px;
+      background: repeating-linear-gradient(135deg, rgba(255,255,255,.025) 0 12px, transparent 12px 24px), var(--ground-2);
+      border: 1px dashed var(--line-2); box-shadow: none; }
+    .slot.missing img { display: none; }
+    .slot.missing::after { content: attr(data-label); max-width: 80%; font-size: 14px; color: var(--text-3); line-height: 1.5; }
+    .slot.missing.tall { aspect-ratio: 1320 / 2868; min-height: 0; }
+    .slot.missing.wide { aspect-ratio: 16 / 9; min-height: 0; }
+    .slot.missing.tab { aspect-ratio: 4 / 3; min-height: 0; }
+    .slot.missing figcaption { display: none; }
+
+    /* Tab list for SportsHub Live */
+    .tabs-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 56px; }
+    .tabcard { padding: 22px; border-radius: 18px; background: var(--card); border: 1px solid var(--line); }
+    .tabcard b { display: block; font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
+    .tabcard span { display: block; margin-top: 6px; font-size: 15px; color: var(--text-2); }
+    .tabcard .tag { display: inline-block; margin-bottom: 12px; font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--blue); }
+
+    /* Sports table */
+    .sports { margin-top: 56px; border: 1px solid var(--line); border-radius: 20px; overflow: hidden; }
+    .sports-row { display: grid; grid-template-columns: 210px 1fr; gap: 24px; padding: 22px 28px; border-top: 1px solid var(--line); }
+    .sports-row:first-child { border-top: 0; }
+    .sports-row:nth-child(odd) { background: rgba(255,255,255,.015); }
+    .sports-row b { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
+    .sports-row b small { display: block; margin-top: 4px; font-size: 13px; font-weight: 500; color: var(--text-3); letter-spacing: 0; }
+    .chiprow { display: flex; flex-wrap: wrap; gap: 8px; align-content: start; }
+    .chiprow span { padding: 6px 12px; border-radius: 999px; font-size: 14px; color: var(--text-2); border: 1px solid var(--line-2); background: rgba(255,255,255,.02); }
+    .chiprow span.hot { color: var(--text); border-color: rgba(229,72,77,.5); background: rgba(229,72,77,.08); }
+    .sports-note { margin-top: 18px; font-size: 14px; color: var(--text-3); }
+
+    @media (max-width: 980px) {
+      .feature, .feature.flip { grid-template-columns: 1fr; gap: 36px; }
+      .feature.flip > :first-child { order: 0; }
+      .tabs-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    @media (max-width: 720px) {
+      .sh-hero { padding-top: 116px; }
+      .sh-hero-art { padding: 0 16px; margin-top: 44px; }
+      .chapters { top: 64px; }
+      .chapter { padding-top: 96px; scroll-margin-top: 112px; }
+      .feature { margin-top: 44px; }
+      .tabs-grid { grid-template-columns: 1fr; }
+      .sports-row { grid-template-columns: 1fr; gap: 12px; padding: 20px; }
+      .media.pair { gap: 10px; }
+    }
+  </style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-apple" viewBox="0 0 24 24"><path fill="currentColor" d="M16.37 12.62c-.02-2.3 1.88-3.4 1.96-3.46-1.07-1.56-2.73-1.78-3.32-1.8-1.41-.14-2.76.83-3.47.83-.72 0-1.82-.81-2.99-.79-1.54.02-2.96.9-3.75 2.27-1.6 2.78-.41 6.89 1.15 9.14.76 1.1 1.67 2.34 2.86 2.3 1.15-.05 1.58-.74 2.97-.74 1.38 0 1.77.74 2.98.72 1.24-.02 2.02-1.12 2.77-2.23.87-1.28 1.23-2.52 1.25-2.58-.03-.01-2.39-.92-2.41-3.66zM14.1 5.86c.63-.77 1.06-1.83.94-2.89-.91.04-2.02.61-2.67 1.37-.58.67-1.1 1.76-.96 2.8 1.02.08 2.06-.52 2.69-1.28z"/></symbol>
+  <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
+</svg>
+
+<header class="nav" id="nav">
+  <div class="wrap">
+    <a href="index.html" class="brand"><img src="apple-touch-icon.png" alt="" width="30" height="30" />TivEPG</a>
+    <ul class="nav-links">
+      <li><a href="index.html#iphone">iPhone</a></li>
+      <li><a href="index.html#ipad">iPad</a></li>
+      <li><a href="index.html#apple-tv">Apple TV</a></li>
+      <li><a href="sports-hub.html" class="current" aria-current="page">Sports Hub</a></li>
+      <li><a href="index.html#faq">FAQ</a></li>
+      <li><a class="nav-get" href="https://apps.apple.com/gb/app/tivepg-iptv-player-sports-hub/id6755161632">Download</a></li>
+    </ul>
+  </div>
+</header>
+
+<main>
+
+  <!-- ============ HERO ============ -->
+  <section class="sh-hero">
+    <div class="wrap">
+      <p class="eyebrow">Sports Hub</p>
+      <h1 class="display" style="margin-top:16px">The whole matchday.<br /><span class="accent">Beside the game.</span></h1>
+      <p class="lede">Every fixture and score, the channel showing it, live stats and tables around the picture, and every goal one press from a replay. Built into the player you already watch on.</p>
+    </div>
+    <div class="sh-hero-art">
+      <img src="screens/tv/live.webp" alt="SportsHub Live on Apple TV: the match squeezed into the corner, live league table on the right and the latest scores along the bottom" width="1600" height="795" fetchpriority="high" />
+    </div>
+  </section>
+
+  <nav class="chapters" aria-label="Sports Hub features">
+    <ul>
+      <li><a href="#hub">The Hub</a></li>
+      <li><a href="#channels">Find the channel</a></li>
+      <li><a href="#live">SportsHub Live</a></li>
+      <li><a href="#replay">Replay</a></li>
+      <li><a href="#highlights">Highlights</a></li>
+      <li><a href="#match-centre">Match Centre</a></li>
+      <li><a href="#tables">Tables &amp; teams</a></li>
+      <li><a href="#sports">Sports</a></li>
+    </ul>
+  </nav>
+
+  <!-- ============ 1. THE HUB ============ -->
+  <section class="chapter" id="hub">
+    <div class="wrap">
+      <div class="chapter-head reveal">
+        <p class="eyebrow">The Hub</p>
+        <h2 class="headline">Every fixture. Every score. <span class="accent">Live.</span></h2>
+        <p class="lede">One place for every competition you follow, from the Premier League to the Ashes to the Super Bowl.</p>
+      </div>
+
+      <div class="feature reveal">
+        <div>
+          <h3>Your sports, <em>your way.</em></h3>
+          <p>Pick a sport, then a league, then a team. Favourite a whole league and every one of its clubs comes with it.</p>
+          <ul class="facts">
+            <li><b>Fixtures, results, highlights and the table</b> for every league, one tap apart.</li>
+            <li><b>Favourites</b> gathers your teams' games from every competition into one list.</li>
+            <li><b>Upcoming</b> lines up every game you care about, with an alert before kick-off.</li>
+            <li><b>A live ticker</b> runs along the top with every game in play and today's whole card.</li>
+          </ul>
+        </div>
+        <div class="media pair">
+          <figure class="portrait"><img src="screens/iphone/01-hub.webp" alt="Sports Hub on iPhone: fixtures with live scores" loading="lazy" /></figure>
+          <figure class="portrait"><img src="screens/iphone/06-upcoming.webp" alt="Upcoming games across every sport with alerts" loading="lazy" /></figure>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 2. FIND THE CHANNEL ============ -->
+  <section class="chapter" id="channels">
+    <div class="wrap">
+      <div class="feature flip reveal">
+        <div>
+          <p class="eyebrow">Channel matching</p>
+          <h3 style="margin-top:14px">Tap a game. <em>We find the channel.</em></h3>
+          <p>TivEPG reads your whole playlist and TV guide and lists every channel showing the game, so you never hunt through hundreds of channels again.</p>
+          <ul class="facts">
+            <li><b>Official broadcasters first</b>, then every other channel carrying it.</li>
+            <li><b>Confidence on every match</b>: Verified, Best Match or High, so you know which one to trust.</li>
+            <li><b>Sources grouped</b>: the same channel in HD, FHD and 4K becomes one row with its sources inside.</li>
+            <li><b>In the TV guide too</b>: your favourites' games are lit gold, and a sports programme in the guide opens its match details.</li>
+          </ul>
+        </div>
+        <div class="media">
+          <figure><img src="screens/ipad/09-channels.webp" alt="Channel matching on iPad: official broadcasters for a game" loading="lazy" /></figure>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 3. SPORTSHUB LIVE ============ -->
+  <section class="chapter center" id="live">
+    <div class="wrap">
+      <div class="chapter-head reveal">
+        <p class="eyebrow">SportsHub Live</p>
+        <h2 class="headline">Watch the game. <span class="accent">Follow every score.</span></h2>
+        <p class="lede">Open it on any channel, at any time. The picture slides into the corner and a live data feed wraps around it, the way a broadcaster's graphics do. Close it and you're back to full screen.</p>
+      </div>
+
+      <div class="feature reveal" style="text-align:left">
+        <div>
+          <h3>Goals, <em>as they go in.</em></h3>
+          <p>A scrolling ticker carries every game in play. When someone scores, the goal flashes up and lands on the latest-scores board.</p>
+          <ul class="facts">
+            <li><b>No spoilers.</b> IPTV runs up to a couple of minutes behind. TivEPG reads the match clock on your picture and holds each goal until it happens on your screen.</li>
+            <li><b>Jump to any game.</b> Pick a match off the Today board and TivEPG switches to a channel showing it.</li>
+            <li><b>Not just on match channels.</b> Watching the news? Open SportsHub Live and the tables, today's scores and your teams are all there.</li>
+          </ul>
+        </div>
+        <div class="media">
+          <figure><img src="screens/tv/live_today.webp" alt="SportsHub Live on Apple TV: today's fixtures board beside the game" loading="lazy" /></figure>
+        </div>
+      </div>
+
+      <div class="tabs-grid reveal" style="text-align:left">
+        <div class="tabcard"><span class="tag">Your match</span><b>Stats</b><span>Possession, shots, the lot, updating live. Leaderboard for golf, Order of Play for tennis, Timing for F1.</span></div>
+        <div class="tabcard"><span class="tag">Your match</span><b>Lineups</b><span>Both team sheets laid out on the pitch, plus the bench.</span></div>
+        <div class="tabcard"><span class="tag">Your match</span><b>Events &amp; Plays</b><span>Every goal, card and sub, or every scoring play in the NFL, NBA and NHL.</span></div>
+        <div class="tabcard"><span class="tag">Your match</span><b>Scorecard</b><span>Cricket's batting and bowling cards, ball by ball.</span></div>
+        <div class="tabcard"><span class="tag">Everything else</span><b>Tables</b><span>Every live league's table, re-ordered by the current scores, rotating through.</span></div>
+        <div class="tabcard"><span class="tag">Everything else</span><b>Today</b><span>Every game today across the leagues you follow, live ones first. Pick one to watch it.</span></div>
+        <div class="tabcard"><span class="tag">Everything else</span><b>Results</b><span>The scores you missed while you were watching.</span></div>
+        <div class="tabcard"><span class="tag">Everything else</span><b>My Teams</b><span>Your clubs' latest and next games, wherever they're playing.</span></div>
+      </div>
+
+      <div class="media pair reveal" style="margin-top:28px">
+        <figure><img src="screens/ipad/06-live-tables.webp" alt="SportsHub Live on iPad: live table and latest scores beside the game" loading="lazy" /></figure>
+        <figure><img src="screens/ipad/07-live-lineups.webp" alt="SportsHub Live on iPad: line-ups beside the game" loading="lazy" /></figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 4. REPLAY ============ -->
+  <section class="chapter" id="replay">
+    <div class="wrap">
+      <div class="feature reveal">
+        <div>
+          <p class="eyebrow">Replay</p>
+          <h3 style="margin-top:14px">Missed the goal? <em>Press it.</em></h3>
+          <p>Every key moment is listed as it happens. Press one and TivEPG rewinds your channel's catch-up to just before it, so you see it the way it was broadcast.</p>
+          <ul class="facts">
+            <li><b>Goals, cards, VAR calls, the foul behind a penalty, kick-offs</b>, each with its team's crest and colour.</li>
+            <li><b>No catch-up on your channel?</b> TivEPG finds another channel showing the match that has it, and plays the moment there.</li>
+            <li><b>Lands on the moment.</b> In football it checks the clock on the rewound picture and corrects itself if it's off.</li>
+            <li><b>Back to Live</b> takes you straight back to the channel and the live picture you left.</li>
+            <li>Works for <b>football, cricket, NFL, NBA and NHL</b>, in SportsHub Live and on the match page.</li>
+          </ul>
+        </div>
+        <div class="media">
+          <figure class="slot wide" data-label="Screenshot to come: the Replay tab in SportsHub Live, a goal selected and the picture rewound"><img src="screens/sports/replay.webp" alt="Replay in SportsHub Live: a goal selected and the channel rewound to it" loading="lazy" /></figure>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 5. HIGHLIGHTS ============ -->
+  <section class="chapter" id="highlights">
+    <div class="wrap">
+      <div class="feature flip reveal">
+        <div>
+          <p class="eyebrow">Highlights</p>
+          <h3 style="margin-top:14px">Missed the game? <em>Watch it back.</em></h3>
+          <p>Every finished game from the last two weeks that has highlights, sorted the way you follow sport.</p>
+          <ul class="facts">
+            <li><b>Latest</b>, then <b>Your Teams</b>, then a row for every competition you follow.</li>
+            <li><b>Every source</b>: official clips, extended highlights and alternatives, side by side.</li>
+            <li><b>Spoiler-free mode</b> keeps scores hidden until you've watched the game.</li>
+            <li><b>Full Match.</b> If a game went out on a channel with catch-up, TivEPG finds it in your provider's archive and plays the whole match from just before kick-off. Stop halfway and it remembers where you were.</li>
+            <li><b>Cycling</b> gets its own highlights, filed by race and stage.</li>
+          </ul>
+        </div>
+        <div class="media pair">
+          <figure class="portrait"><img src="screens/iphone/05-highlights.webp" alt="Highlights on iPhone: latest clips and your teams" loading="lazy" /></figure>
+          <figure class="portrait slot tall" data-label="Screenshot to come: a game's Full Match replay from catch-up"><img src="screens/sports/full-match.webp" alt="Full-match replay from catch-up in Highlights" loading="lazy" /></figure>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 6. MATCH CENTRE ============ -->
+  <section class="chapter" id="match-centre">
+    <div class="wrap">
+      <div class="feature reveal">
+        <div>
+          <p class="eyebrow">Match Centre</p>
+          <h3 style="margin-top:14px">Team news, <em>the moment it lands.</em></h3>
+          <p>Every game has its own page, with the channels to watch it at the top and everything about it underneath.</p>
+          <ul class="facts">
+            <li><b>Summary, Stats, Lineups, Table, H2H &amp; Form and Scores</b>, plus Replay once it's under way.</li>
+            <li><b>Built for each sport</b>: cricket scorecards and match situation, golf leaderboards and tee times, tennis draws, F1 timing and the circuit, NFL RedZone.</li>
+            <li><b>Cup ties</b> show the aggregate, the first leg and who goes through. Play-offs show the series state.</li>
+            <li><b>Player of the match</b>, recent form and head-to-head when the data has it.</li>
+          </ul>
+        </div>
+        <div class="media pair">
+          <figure class="portrait"><img src="screens/iphone/08-lineups.webp" alt="Match Centre on iPhone: line-ups on the pitch" loading="lazy" /></figure>
+          <figure class="portrait"><img src="screens/iphone/02-channels.webp" alt="Match Centre on iPhone: channels showing the game" loading="lazy" /></figure>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 7. TABLES & TEAMS ============ -->
+  <section class="chapter" id="tables">
+    <div class="wrap">
+      <div class="feature flip reveal">
+        <div>
+          <p class="eyebrow">Live tables &amp; team pages</p>
+          <h3 style="margin-top:14px">The table moves <em>as the goals go in.</em></h3>
+          <p>League tables are worked out from the live scores, so you see where everyone would finish if it ended now, not where they stood this morning.</p>
+          <ul class="facts">
+            <li><b>Live positions</b> across every league with games in play.</li>
+            <li><b>Knockout brackets</b> for cups and play-offs, with series and aggregate scores.</li>
+            <li><b>Team pages</b>: the next match, the last five results as form tiles, league position, the next five fixtures and every result across competitions.</li>
+            <li><b>Open a team</b> from any table row, or tap a crest on a match page.</li>
+          </ul>
+        </div>
+        <div class="media pair">
+          <figure class="portrait slot tall" data-label="Screenshot to come: a team page with form, position and fixtures"><img src="screens/sports/team-page.webp" alt="A team page with form, league position and fixtures" loading="lazy" /></figure>
+          <figure class="portrait slot tall" data-label="Screenshot to come: a live league table during matchday"><img src="screens/sports/live-table.webp" alt="A live league table re-ordered by the current scores" loading="lazy" /></figure>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 8. SPORTS ============ -->
+  <section class="chapter" id="sports">
+    <div class="wrap">
+      <div class="chapter-head reveal">
+        <p class="eyebrow">Sports</p>
+        <h2 class="headline">From kick-off <span class="accent">to the 18th green.</span></h2>
+        <p class="lede">Every sport gets fixtures, results and the channels showing it. These get live data you can open while you watch.</p>
+      </div>
+
+      <div class="sports reveal">
+        <div class="sports-row"><b>Football<small>Premier League to the World Cup</small></b>
+          <div class="chiprow"><span class="hot">Live stats</span><span class="hot">Replay</span><span>Line-ups &amp; formations</span><span>Match timeline</span><span>Live tables</span><span>Form &amp; H2H</span><span>Brackets &amp; aggregates</span><span>Highlights</span></div></div>
+        <div class="sports-row"><b>Cricket<small>Tests, ODIs, T20s, franchise leagues</small></b>
+          <div class="chiprow"><span class="hot">Live scorecards</span><span class="hot">Replay</span><span>Batting &amp; bowling</span><span>Match situation</span><span>Day by day</span></div></div>
+        <div class="sports-row"><b>NFL, NBA, NHL<small>Plus college football and basketball</small></b>
+          <div class="chiprow"><span class="hot">Box scores</span><span class="hot">Replay</span><span>Scoring plays</span><span>Team &amp; player stats</span><span>Standings</span><span>Play-off brackets</span><span>NFL RedZone</span></div></div>
+        <div class="sports-row"><b>MLB</b>
+          <div class="chiprow"><span class="hot">Box scores</span><span>Team &amp; player stats</span><span>Standings</span><span>Series state</span></div></div>
+        <div class="sports-row"><b>Formula 1</b>
+          <div class="chiprow"><span class="hot">Live timing</span><span>Gaps &amp; running order</span><span>Session results</span><span>The circuit</span></div></div>
+        <div class="sports-row"><b>Tennis<small>ATP and WTA</small></b>
+          <div class="chiprow"><span class="hot">Live scores</span><span>Order of Play</span><span>The full draw</span></div></div>
+        <div class="sports-row"><b>Golf<small>PGA Tour, DP World Tour, LIV</small></b>
+          <div class="chiprow"><span class="hot">Live leaderboard</span><span>Tee times</span><span>Defending champion</span></div></div>
+        <div class="sports-row"><b>Basketball<small>WNBA, EuroLeague and more</small></b>
+          <div class="chiprow"><span class="hot">Live box scores</span><span>Line-ups</span></div></div>
+        <div class="sports-row"><b>And more</b>
+          <div class="chiprow"><span>Rugby</span><span>AFL</span><span>Darts</span><span>Snooker</span><span>Cycling</span><span>MotoGP</span><span>UFC</span><span>Boxing</span></div></div>
+      </div>
+      <p class="sports-note">Replay needs a channel with catch-up from your provider.</p>
+    </div>
+  </section>
+
+  <!-- ============ CTA ============ -->
+  <section class="final">
+    <div class="wrap reveal">
+      <img class="icon" src="apple-touch-icon.png" alt="" width="96" height="96" loading="lazy" />
+      <h2 class="headline">Kick-off is waiting.</h2>
+      <div class="hero-cta">
+        <a class="btn btn-store" href="https://apps.apple.com/gb/app/tivepg-iptv-player-sports-hub/id6755161632">
+          <svg><use href="#i-apple"/></svg><span><small>Download on the</small><b>App Store</b></span>
+        </a>
+        <a class="btn btn-ghost" href="https://discord.gg/CvKnmsVUdM" target="_blank" rel="noopener">Join the Discord</a>
+      </div>
+      <p class="fine">TivEPG is a player only. No channels, streams or subscriptions are included.</p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>&copy; 2026 TivEPG</span>
+    <nav>
+      <a href="index.html">Home</a>
+      <a href="privacy.html">Privacy</a>
+      <a href="terms.html">Terms</a>
+      <a href="support.html">Support</a>
+      <a href="https://discord.gg/CvKnmsVUdM" target="_blank" rel="noopener">Discord</a>
+    </nav>
+  </div>
+</footer>
+
+<div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Preview">
+  <button class="lightbox-close" type="button" aria-label="Close"><svg><use href="#i-close"/></svg></button>
+  <div class="lightbox-body"></div>
+</div>
+
+<script>
+(() => {
+  const nav = document.getElementById('nav');
+  const onScroll = () => nav.classList.toggle('solid', window.scrollY > 24);
+  onScroll(); window.addEventListener('scroll', onScroll, { passive: true });
+
+  const io = new IntersectionObserver(entries => entries.forEach(e => {
+    if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+  }), { rootMargin: '0px 0px -8% 0px' });
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+  // Screenshot slots: a placeholder until the image file exists
+  document.querySelectorAll('.slot img').forEach(img => {
+    const mark = () => img.closest('.slot').classList.add('missing');
+    if (img.complete && img.naturalWidth === 0) mark();
+    img.addEventListener('error', mark);
+    img.loading = 'eager';
+  });
+
+  // Chapter strip: highlight the chapter in view
+  const links = [...document.querySelectorAll('.chapters a')];
+  const chapters = links.map(a => document.querySelector(a.getAttribute('href')));
+  let current = null;
+  const spy = () => {
+    const line = innerHeight * 0.4;
+    let id = null;
+    chapters.forEach(c => { if (c.getBoundingClientRect().top <= line) id = c.id; });
+    if (id === current) return;
+    current = id;
+    links.forEach(a => {
+      const on = a.getAttribute('href') === '#' + id;
+      a.classList.toggle('active', on);
+      if (on) a.scrollIntoView({ block: 'nearest', inline: 'center', behavior: 'smooth' });
+    });
+  };
+  window.addEventListener('scroll', spy, { passive: true });
+  spy();
+
+  // Lightbox
+  const box = document.getElementById('lightbox');
+  const body = box.querySelector('.lightbox-body');
+  const close = () => { box.classList.remove('open'); document.body.style.overflow = ''; setTimeout(() => body.replaceChildren(), 250); };
+  document.querySelectorAll('.media figure, .sh-hero-art img').forEach(el => el.addEventListener('click', () => {
+    if (el.classList.contains('missing')) return;
+    const src = (el.tagName === 'IMG' ? el : el.querySelector('img'));
+    const img = new Image(); img.src = src.currentSrc || src.src; img.alt = src.alt;
+    body.replaceChildren(img); box.classList.add('open'); document.body.style.overflow = 'hidden';
+  }));
+  box.addEventListener('click', e => { if (e.target === box || e.target.closest('.lightbox-close')) close(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && box.classList.contains('open')) close(); });
+})();
+</script>
+</body>
+</html>
