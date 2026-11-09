@@ -717,25 +717,97 @@
     return el("div", { class: "hub-row depth-" + depth }, lead || null, main, ...(trailing || []));
   }
 
+  // A competition opens to its teams, like the app's team picker: a switch to show or hide each
+  // team in the Sports Hub and a star to favourite it. Loaded from their device when opened.
+  const teamCache = new Map();
+  const teamSearch = new Map();
+  const teamKey = (code, competition) => "teams:" + code + "|" + competition;
+
+  async function loadTeams(code, competition) {
+    const key = teamKey(code, competition);
+    teamCache.set(key, { loading: true });
+    const r = await command("sportsTeams", { code, competition });
+    teamCache.set(key, r.ok ? r : { error: r.message || "Couldn't load the teams." });
+    renderSports();
+  }
+
+  async function teamAction(type, fields) {
+    const r = await run(type, fields);
+    if (r.ok && r.teams) teamCache.set(teamKey(fields.code, fields.competition), r);
+    renderSports();
+  }
+
+  function teamRows(code, competition, depth) {
+    const key = teamKey(code, competition);
+    const data = teamCache.get(key);
+    if (!data || data.loading) return [el("div", { class: "hub-row depth-" + depth }, el("div", { class: "sub", text: "Loading teams…" }))];
+    if (data.error) return [el("div", { class: "hub-row depth-" + depth }, el("div", { class: "sub", text: data.error }))];
+
+    const rows = [];
+    const whole = el("button", { class: "btn small" + (data.competitionFavourite ? "" : " gold-btn"), type: "button",
+      text: data.competitionFavourite ? "Remove Competition" : "★ Favourite Whole Competition" });
+    whole.addEventListener("click", () => teamAction("sportsFavouriteCompetition",
+      { id: competition, favourite: !data.competitionFavourite, code, competition }));
+    rows.push(el("div", { class: "hub-row team-tools depth-" + depth },
+      el("div", { class: "grow sub", text: "The switch shows or hides a team in the Sports Hub - a shown team includes its full schedule, whatever the competition. Tap the star to favourite a team." }),
+      whole));
+
+    const teams = data.teams || [];
+    let list = teams;
+    if (teams.length > 20) {
+      const q = teamSearch.get(key) || "";
+      const search = el("input", { class: "search team-search", placeholder: `Search ${teams.length} teams`, value: q });
+      search.dataset.teamsearch = key;
+      search.addEventListener("input", () => { teamSearch.set(key, search.value); renderSports(); });
+      rows.push(el("div", { class: "hub-row depth-" + depth }, search));
+      const needle = q.trim().toLowerCase();
+      if (needle) list = teams.filter((t) => t.name.toLowerCase().includes(needle));
+    }
+    if (!teams.length) rows.push(el("div", { class: "hub-row depth-" + depth }, el("div", { class: "sub", text: "No teams available." })));
+    for (const t of list) {
+      const fav = el("button", { class: "star" + (t.favourite ? " on" : ""), type: "button",
+        "aria-label": (t.favourite ? "Unfavourite " : "Favourite ") + t.name, text: t.favourite ? "★" : "＋" });
+      fav.addEventListener("click", () => teamAction("sportsFavouriteTeam", { team: t.name, favourite: !t.favourite, code, competition }));
+      rows.push(hubRow({ title: t.name, depth, subtitle: t.shown ? "Shown in hub" : "Hidden from hub",
+        trailing: [fav, hubSwitch(t.shown ? "on" : "off", "Show " + t.name + " in Sports Hub",
+          () => teamAction("sportsToggleTeam", { code, competition, team: t.name }))] }));
+    }
+    return rows;
+  }
+
+  function withTeams(rows, code, competition, depth) {
+    const key = teamKey(code, competition);
+    if (sportsOpen.has(key)) {
+      if (!teamCache.has(key)) loadTeams(code, competition);
+      rows.push(...teamRows(code, competition, depth + 1));
+    }
+    return rows;
+  }
+
   function itemRows(item, depth) {
     const rows = [];
     if (item.kind === "competition") {
       rows.push(hubRow({ title: item.name, subtitle: item.subtitle, depth,
         subtitleClass: /favourited/.test(item.subtitle) ? "gold" : "",
+        expandKey: teamKey(item.code, item.name),
         trailing: [star(item), hubSwitch(item.state, "Show " + item.name,
           () => run("sportsToggleCompetition", { code: item.code, competition: item.name }))] }));
-      return rows;
+      return withTeams(rows, item.code, item.name, depth);
     }
-    const key = item.competitions ? "tab:" + item.code : null;
+    // A tab with several competitions opens to them; a one-competition tab opens to its teams.
+    const singleComp = !item.competitions && item.favouriteID ? item.favouriteID : null;
+    const key = item.competitions ? "tab:" + item.code : singleComp ? teamKey(item.code, singleComp) : null;
     rows.push(hubRow({ title: item.name, subtitle: item.loading ? "Loading…" : item.subtitle, depth, expandKey: key,
       trailing: [star(item), hubSwitch(item.state, "Show " + item.name,
         () => run("sportsShowAll", { codes: [item.code], enabled: item.state !== "on", label: item.name }))] }));
-    if (key && sportsOpen.has(key)) for (const c of item.competitions) rows.push(...itemRows(c, depth + 1));
+    if (item.competitions && sportsOpen.has(key)) for (const c of item.competitions) rows.push(...itemRows(c, depth + 1));
+    if (singleComp) withTeams(rows, item.code, singleComp, depth);
     return rows;
   }
 
   function renderSports() {
     const panel = $("tab-sports");
+    const focusedTeamSearch = document.activeElement && document.activeElement.dataset.teamsearch;
     const sports = snapshot.sports || {};
     panel.replaceChildren();
     if (!sports.groups) {
@@ -806,6 +878,10 @@
     }
     panel.append(teams);
 
+    if (focusedTeamSearch) {
+      const again = panel.querySelector(`input[data-teamsearch="${CSS.escape(focusedTeamSearch)}"]`);
+      if (again) { again.focus(); again.setSelectionRange(again.value.length, again.value.length); }
+    }
     panel.append(el("p", { class: "hint foot-note",
       text: "A switch shows or hides that part of the Sports Hub - blue means only some of it is shown. Your favourites always appear in Favourites, whatever is hidden here." }));
   }

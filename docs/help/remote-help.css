@@ -304,3 +304,14 @@ input:focus, select:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgb
   .item { gap: 6px; padding: 8px 8px 8px 4px; }
   .item .btn.small { padding: 0 9px; }
 }
+
+/* ---------- Team lists (the app's team picker) ---------- */
+.hub-row.depth-3 { padding-left: 74px; background: rgba(255,255,255,.045); }
+.team-tools { flex-wrap: wrap; }
+.team-tools .sub { min-width: 200px; }
+.gold-btn { color: #F5C451; border-color: rgba(245,196,81,.5); }
+.team-search { margin: 0; height: 42px; }
+@media (max-width: 560px) {
+  .hub-row.depth-2 { padding-left: 34px; }
+  .hub-row.depth-3 { padding-left: 44px; }
+}
