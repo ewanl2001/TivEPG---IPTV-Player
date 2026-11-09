@@ -56,14 +56,62 @@
     "@context": "https://schema.org",
     "@type": "FAQPage",
     "mainEntity": [
-      { "@type": "Question", "name": "Does TivEPG include channels?",
-        "acceptedAnswer": { "@type": "Answer", "text": "No. TivEPG is a player. Add your own Xtream Codes login or M3U playlist and it builds your guide, channels, movies and series from that." } },
-      { "@type": "Question", "name": "Which devices does TivEPG run on?",
-        "acceptedAnswer": { "@type": "Answer", "text": "iPhone, iPad and Apple TV, with a native app on each." } },
-      { "@type": "Question", "name": "How does channel matching work?",
-        "acceptedAnswer": { "@type": "Answer", "text": "Pick a fixture in the Sports Hub and TivEPG searches your whole playlist and guide for the channels showing it, putting the official broadcasters first." } },
-      { "@type": "Question", "name": "Is TivEPG a TiviMate alternative for Apple TV?",
-        "acceptedAnswer": { "@type": "Answer", "text": "Yes. TiviMate is Android only. TivEPG gives iPhone, iPad and Apple TV a full EPG guide, catch-up, Multiview and a built-in Sports Hub." } }
+      {
+        "@type": "Question",
+        "name": "Which sports does TivEPG cover?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Football, cricket, tennis, golf, Formula 1, NFL, NBA, NHL, MLB, rugby, AFL, darts, snooker, cycling, MotoGP, UFC and boxing, each with fixtures, results and the channels showing it in your playlist."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Which sports have live data I can use while I watch?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Football: Live stats, line-ups and formations, match timeline, live league tables, form and head-to-head, knockout brackets, highlights; Cricket: Live scorecards, batting and bowling figures, session-by-session state, Tests, ODIs, T20s and franchise leagues; NFL, NBA, NHL, MLB: Box scores, team and player stats, live standings, playoff brackets and series state; Formula 1: Live running order and gaps, session results for practice, qualifying and the race; Tennis: Live scores and the full tournament draw for ATP and WTA events; Golf: Live tournament leaderboards across the PGA Tour, DP World Tour and LIV; Basketball: NBA, WNBA, EuroLeague and more, with live box scores. It sits beside the picture in SportsHub Live and the Match Centre."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "What can I do while a game is on?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Open live stats, tables and line-ups beside the picture, follow every other score on the ticker, jump back to key moments with Replay, or put up to four games on screen with Multiview."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Does TivEPG include channels?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "No. TivEPG is a player. Add your own Xtream Codes login or M3U playlist and it builds your guide, channels, movies and series from that."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Which devices does TivEPG run on?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "iPhone, iPad and Apple TV, with a native app on each."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "How does channel matching work?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Pick a fixture in the Sports Hub and TivEPG searches your whole playlist and guide for the channels showing it, putting the official broadcasters first."
+        }
+      },
+      {
+        "@type": "Question",
+        "name": "Is TivEPG a TiviMate alternative for Apple TV?",
+        "acceptedAnswer": {
+          "@type": "Answer",
+          "text": "Yes. TiviMate is Android only. TivEPG gives iPhone, iPad and Apple TV a full EPG guide, catch-up, Multiview and a built-in Sports Hub."
+        }
+      }
     ]
   }
   </script>
@@ -291,6 +339,13 @@
     .faq summary::after { content: ""; position: absolute; right: 6px; top: 50%; width: 10px; height: 10px; border-right: 2px solid var(--text-3); border-bottom: 2px solid var(--text-3); transform: translateY(-70%) rotate(45deg); transition: transform .25s var(--ease); }
     .faq details[open] summary::after { transform: translateY(-30%) rotate(-135deg); }
     .faq details p { padding: 0 40px 24px 0; color: var(--text-2); }
+
+    .sport-data { list-style: none; margin: 0 40px 18px 0; display: grid; gap: 0; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+    .sport-data li { display: grid; grid-template-columns: 150px 1fr; gap: 16px; padding: 14px 18px; border-top: 1px solid var(--line); background: rgba(255,255,255,.015); }
+    .sport-data li:first-child { border-top: 0; }
+    .sport-data b { font-weight: 700; font-size: 15px; }
+    .sport-data span { color: var(--text-2); font-size: 15px; }
+    @media (max-width: 720px) { .sport-data { margin-right: 0; } .sport-data li { grid-template-columns: 1fr; gap: 2px; } }
 
     /* ---------- Final CTA ---------- */
     .final { position: relative; margin-top: 150px; padding: 120px 0; text-align: center; overflow: hidden; border-top: 1px solid var(--line); }
@@ -548,6 +603,22 @@
         <h2 class="headline" style="margin-top:14px">Good to know.</h2>
       </div>
       <div class="reveal">
+        <details open><summary>Which sports does TivEPG cover?</summary>
+          <p>Football, cricket, tennis, golf, Formula 1, NFL, NBA, NHL, MLB, rugby, AFL, darts, snooker, cycling, MotoGP, UFC and boxing. Every one gets fixtures, results and the channels showing it in your playlist.</p>
+        </details>
+        <details><summary>Which sports have live data I can use while I watch?</summary>
+          <ul class="sport-data">
+            <li><b>Football</b><span>Live stats, line-ups and formations, match timeline, live league tables, form and head-to-head, knockout brackets, highlights</span></li>
+            <li><b>Cricket</b><span>Live scorecards, batting and bowling figures, session-by-session state, Tests, ODIs, T20s and franchise leagues</span></li>
+            <li><b>NFL, NBA, NHL, MLB</b><span>Box scores, team and player stats, live standings, playoff brackets and series state</span></li>
+            <li><b>Formula 1</b><span>Live running order and gaps, session results for practice, qualifying and the race</span></li>
+            <li><b>Tennis</b><span>Live scores and the full tournament draw for ATP and WTA events</span></li>
+            <li><b>Golf</b><span>Live tournament leaderboards across the PGA Tour, DP World Tour and LIV</span></li>
+            <li><b>Basketball</b><span>NBA, WNBA, EuroLeague and more, with live box scores</span></li>
+          </ul>
+          <p>It all sits beside the picture in SportsHub Live and the Match Centre, so you never leave the game to check a score.</p>
+        </details>
+        <details><summary>What can I do while a game is on?</summary><p>Open live stats, tables and line-ups beside the picture, follow every other score on the ticker, jump back to key moments with Replay, or put up to four games on screen with Multiview.</p></details>
         <details><summary>Does TivEPG include channels?</summary><p>No. TivEPG is a player. Add your own Xtream Codes login or M3U playlist and it builds your guide, channels, movies and series from that.</p></details>
         <details><summary>Which devices does it run on?</summary><p>iPhone, iPad and Apple TV, with a native app on each.</p></details>
         <details><summary>How does channel matching work?</summary><p>Pick a fixture in the Sports Hub and TivEPG searches your whole playlist and guide for the channels showing it, putting the official broadcasters first.</p></details>
