@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>Remote Help - TivEPG</title>
+  <meta name="description" content="Set up TivEPG for someone else from wherever you are. Works with TivEPG on iPhone, iPad and Apple TV." />
+  <!-- This page shows playlist logins: no analytics, no third-party scripts, no referrer. -->
+  <meta name="robots" content="noindex" />
+  <meta name="referrer" content="no-referrer" />
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src wss://remote-help.ewan-laww.workers.dev; base-uri 'none'; form-action 'none'" />
+  <meta name="theme-color" content="#0A0E15" />
+  <meta name="apple-itunes-app" content="app-id=6755161632" />
+  <link rel="icon" type="image/png" href="../favicon.png" />
+  <link rel="apple-touch-icon" href="../apple-touch-icon.png" />
+  <link rel="stylesheet" href="remote-help.css" />
+</head>
+<body>
+<svg width="0" height="0" class="sprite" aria-hidden="true">
+  <symbol id="i-iphone" viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="19" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M10.5 18.5h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-ipad" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M11 18h2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-tv" viewBox="0 0 24 24"><rect x="2.5" y="4" width="19" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8 20.5h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+  <symbol id="i-cloud-off" viewBox="0 0 24 24"><path d="M7 18h10a4 4 0 0 0 .6-7.95A5.5 5.5 0 0 0 7.1 9.1 4.5 4.5 0 0 0 7 18Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M4 4l16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 7.5V12l3 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+</svg>
+
+<header class="nav">
+  <div class="wrap">
+    <a class="brand" href="../"><img src="../apple-touch-icon.png" alt="" width="30" height="30" />TivEPG</a>
+    <a class="nav-get" href="https://apps.apple.com/gb/app/tivepg-iptv-player-sports-hub/id6755161632">Get the app</a>
+  </div>
+</header>
+
+<main id="app">
+
+  <!-- 1. Enter the number -->
+  <section id="screen-join" class="screen hero">
+    <img class="icon" src="../apple-touch-icon.png" alt="TivEPG app icon" width="84" height="84" />
+    <p class="eyebrow">Remote Help</p>
+    <h1 class="display">Set up TivEPG<br /><span class="accent">for someone else.</span></h1>
+    <p class="lede">Sort out their playlists, channels, movies, series and Sports Hub from here. They don't need to do a thing.</p>
+
+    <div class="join-card">
+      <label for="code">The number on their screen</label>
+      <input id="code" class="code-input" inputmode="numeric" autocomplete="one-time-code" maxlength="7"
+             placeholder="000 000" spellcheck="false" />
+      <label for="name">Your name <span class="muted">(so they know it's you)</span></label>
+      <input id="name" maxlength="30" placeholder="e.g. Ewan" autocomplete="given-name" />
+      <button id="join" class="btn btn-white wide" type="button">Connect</button>
+      <p id="join-error" class="error" hidden></p>
+    </div>
+
+    <ol class="how">
+      <li>
+        <span class="how-num">1</span>
+        <div>
+          <b>On their iPhone, iPad or Apple TV</b>
+          <p>They open TivEPG, go to <b>Settings</b> and choose <b>Remote Help</b>.</p>
+          <div class="devices-row" aria-hidden="true">
+            <svg><use href="#i-iphone"/></svg><svg><use href="#i-ipad"/></svg><svg><use href="#i-tv"/></svg>
+          </div>
+        </div>
+      </li>
+      <li>
+        <span class="how-num">2</span>
+        <div>
+          <b>They tell you the number</b>
+          <p>It's 6 digits. If they send you a photo of the square code, scan it and the number fills in by itself.</p>
+        </div>
+      </li>
+      <li>
+        <span class="how-num">3</span>
+        <div>
+          <b>You make the changes here</b>
+          <p>Everything appears on their screen straight away, and they can see that you're connected.</p>
+        </div>
+      </li>
+    </ol>
+
+    <ul class="trust">
+      <li><svg><use href="#i-lock"/></svg>Encrypted between you and their device</li>
+      <li><svg><use href="#i-cloud-off"/></svg>No accounts, nothing stored</li>
+      <li><svg><use href="#i-clock"/></svg>Ends when they stop it, or after 30 minutes</li>
+    </ul>
+  </section>
+
+  <!-- 2. Connecting -->
+  <section id="screen-connecting" class="screen center" hidden>
+    <img class="icon pulse" src="../apple-touch-icon.png" alt="" width="84" height="84" />
+    <h2 id="connecting-text">Connecting…</h2>
+    <p class="muted">Keep Remote Help open on their screen.</p>
+  </section>
+
+  <!-- 3. Connected -->
+  <section id="screen-help" class="screen" hidden>
+    <div class="device-head">
+      <span class="device-glyph"><svg id="device-icon"><use href="#i-tv"/></svg></span>
+      <div class="grow">
+        <p class="eyebrow">Remote Help</p>
+        <h1 id="device-title" class="headline">Connected</h1>
+        <p id="device-sub" class="muted"></p>
+      </div>
+      <span id="link-pill" class="pill ok">Connected</span>
+    </div>
+    <div id="loading-banner" class="banner" hidden></div>
+
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-tab="playlists" role="tab">Playlists</button>
+      <button class="tab" data-tab="live" role="tab">TV Channels</button>
+      <button class="tab" data-tab="vod" role="tab">Movies</button>
+      <button class="tab" data-tab="series" role="tab">Series</button>
+      <button class="tab" data-tab="sports" role="tab">Sports Hub</button>
+    </nav>
+
+    <div id="tab-playlists" class="tab-panel">
+      <p class="hint">Their playlists. Fix a login, switch one on or off, or add a new one. After a change their device reloads that playlist by itself.</p>
+      <div id="server-list"></div>
+      <div class="row-actions">
+        <button id="add-server-toggle" class="btn btn-white" type="button">+ Add a playlist</button>
+        <button id="reload-all" class="btn" type="button">Reload all playlists</button>
+      </div>
+      <div id="add-server" class="card" hidden>
+        <h3>Add a playlist</h3>
+        <label for="add-kind">Type</label>
+        <select id="add-kind">
+          <option value="xtream">Login details (Xtream Codes)</option>
+          <option value="m3u">Playlist link (M3U)</option>
+        </select>
+        <label for="add-name">Name</label>
+        <input id="add-name" placeholder="e.g. My TV" maxlength="60" />
+        <label for="add-url" id="add-url-label">Server address</label>
+        <input id="add-url" placeholder="http://example.com:8080" autocapitalize="off" autocorrect="off" spellcheck="false" />
+        <div id="add-login">
+          <label for="add-user">Username</label>
+          <input id="add-user" autocapitalize="off" autocorrect="off" spellcheck="false" autocomplete="off" />
+          <label for="add-pass">Password</label>
+          <input id="add-pass" autocapitalize="off" autocorrect="off" spellcheck="false" autocomplete="off" />
+        </div>
+        <label for="add-epg">TV guide link <span class="muted">(optional)</span></label>
+        <input id="add-epg" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Leave blank to use the playlist's own guide" />
+        <div class="row-actions">
+          <button id="add-save" class="btn btn-white" type="button">Add to their device</button>
+          <button id="add-cancel" class="btn" type="button">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="tab-live" class="tab-panel" hidden></div>
+    <div id="tab-vod" class="tab-panel" hidden></div>
+    <div id="tab-series" class="tab-panel" hidden></div>
+
+    <div id="tab-sports" class="tab-panel" hidden>
+      <p class="hint">Which competitions show as tabs in their Sports Hub, and in what order.</p>
+      <div id="competition-list" class="list"></div>
+      <h3 class="section-title">Favourite teams</h3>
+      <div id="team-list" class="list"></div>
+      <h3 class="section-title">Favourite competitions</h3>
+      <div id="league-list" class="list"></div>
+    </div>
+  </section>
+
+  <!-- 4. Finished -->
+  <section id="screen-ended" class="screen center" hidden>
+    <span class="done-glyph"><svg><use href="#i-check"/></svg></span>
+    <h1 id="ended-title" class="headline">Remote Help has ended</h1>
+    <p id="ended-text" class="lede"></p>
+    <button id="again" class="btn btn-white" type="button">Enter another number</button>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="wrap">
+    <span>© TivEPG</span>
+    <a href="../privacy.html">Privacy</a>
+    <a href="../support.html">Support</a>
+  </div>
+</footer>
+
+<div id="toast" class="toast" hidden></div>
+
+<script src="remote-help.js"></script>
+</body>
+</html>
