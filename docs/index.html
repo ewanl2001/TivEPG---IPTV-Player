@@ -250,6 +250,37 @@
 
     .film-cta { display: flex; justify-content: center; margin-top: 44px; }
 
+    /* ---------- Device switcher ---------- */
+    .pick { display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 28px; flex-wrap: wrap; font-size: 15px; color: var(--text-3); }
+    .pick span { margin-right: 4px; }
+    .pick a { display: inline-flex; align-items: center; gap: 7px; padding: 8px 14px; border-radius: 999px; color: var(--text-2); border: 1px solid var(--line); transition: color .2s, border-color .2s, background .2s; }
+    .pick a:hover { color: var(--text); border-color: var(--line-2); background: rgba(255,255,255,.04); }
+    .pick svg, .switch svg { width: 17px; height: 17px; flex: none; }
+
+    .switch-bar { position: sticky; top: 76px; z-index: 40; display: flex; justify-content: center; margin-top: 72px; pointer-events: none; }
+    .switch {
+      position: relative; display: flex; gap: 4px; padding: 5px; border-radius: 999px; pointer-events: auto;
+      background: rgba(18,26,39,.82); border: 1px solid var(--line-2); box-shadow: 0 12px 40px rgba(0,0,0,.45);
+      backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px);
+    }
+    .switch a {
+      position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 20px;
+      border-radius: 999px; font-size: 15px; font-weight: 600; color: var(--text-2); transition: color .3s var(--ease); white-space: nowrap;
+    }
+    .switch a:hover { color: var(--text); }
+    .switch a.active { color: #0A0E15; }
+    .switch-thumb { position: absolute; z-index: 0; top: 5px; height: 40px; left: 0; width: 0; border-radius: 999px; background: #fff; opacity: 0; transition: transform .45s var(--ease), width .45s var(--ease), opacity .3s; }
+    .switch-thumb.on { opacity: 1; }
+    .devices .platform:first-of-type { padding-top: 72px; }
+    .platform { scroll-margin-top: 72px; }
+    @media (max-width: 720px) {
+      .switch-bar { top: 72px; margin-top: 56px; }
+      .switch a { padding: 0 14px; font-size: 14px; height: 38px; gap: 6px; }
+      .switch-thumb { height: 38px; }
+      .devices .platform:first-of-type { padding-top: 56px; }
+      .platform { scroll-margin-top: 92px; }
+    }
+
     /* ---------- FAQ ---------- */
     .faq { padding: 150px 0 0; }
     .faq-grid { display: grid; grid-template-columns: 1fr 1.4fr; gap: 64px; align-items: start; }
@@ -330,6 +361,9 @@
   <symbol id="i-sound" viewBox="0 0 24 24"><path fill="currentColor" d="M11 5 6 9H3v6h3l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></symbol>
   <symbol id="i-left" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="i-right" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6" stroke="currentColor" stroke-width="2.2" fill="none" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-iphone" viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="19" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M10.5 18.5h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-ipad" viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M11 18h2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-tv" viewBox="0 0 24 24"><rect x="2.5" y="4" width="19" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M8 20.5h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
   <symbol id="i-close" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/></symbol>
 </svg>
 
@@ -361,6 +395,12 @@
         </a>
         <button class="btn btn-ghost" type="button" data-film><svg><use href="#i-play"/></svg>Watch the film</button>
       </div>
+      <div class="pick">
+        <span>See it on</span>
+        <a href="#iphone" data-target="iphone"><svg><use href="#i-iphone"/></svg>iPhone</a>
+        <a href="#ipad" data-target="ipad"><svg><use href="#i-ipad"/></svg>iPad</a>
+        <a href="#apple-tv" data-target="apple-tv"><svg><use href="#i-tv"/></svg>Apple TV</a>
+      </div>
     </div>
     <div class="hero-art">
       <img src="media/hero-2400.webp" srcset="media/hero-1200.webp 1200w, media/hero-2400.webp 2400w" sizes="100vw"
@@ -376,6 +416,16 @@
     </div>
   </section>
 
+  <div class="devices" id="devices">
+    <nav class="switch-bar" aria-label="Choose your device">
+      <div class="switch" role="tablist">
+        <a href="#iphone" data-target="iphone" role="tab"><svg><use href="#i-iphone"/></svg>iPhone</a>
+        <a href="#ipad" data-target="ipad" role="tab"><svg><use href="#i-ipad"/></svg>iPad</a>
+        <a href="#apple-tv" data-target="apple-tv" role="tab"><svg><use href="#i-tv"/></svg>Apple TV</a>
+        <span class="switch-thumb" aria-hidden="true"></span>
+      </div>
+    </nav>
+
   <!-- ============ iPHONE ============ -->
   <section class="platform" id="iphone">
     <div class="wrap platform-head reveal">
@@ -388,7 +438,7 @@
       <div class="stage phone-stage">
         <div class="phone">
           <video data-auto muted loop playsinline preload="none" poster="media/iphone-preview-poster.jpg" aria-label="TivEPG on iPhone, App Store preview">
-            <source src="media/iphone-preview.mp4" type="video/mp4" />
+            <source src="media/iphone-preview.mp4#t=3" type="video/mp4" />
           </video>
           <button class="sound" type="button" aria-label="Sound" aria-pressed="false"><svg class="off"><use href="#i-muted"/></svg><svg class="on"><use href="#i-sound"/></svg></button>
         </div>
@@ -428,7 +478,7 @@
       <div class="stage wide-stage">
         <div class="tablet" style="position:relative">
           <video data-auto muted loop playsinline preload="none" poster="media/ipad-preview-poster.jpg" aria-label="TivEPG on iPad, App Store preview">
-            <source src="media/ipad-preview.mp4" type="video/mp4" />
+            <source src="media/ipad-preview.mp4#t=3" type="video/mp4" />
           </video>
           <button class="sound" type="button" aria-label="Sound" aria-pressed="false"><svg class="off"><use href="#i-muted"/></svg><svg class="on"><use href="#i-sound"/></svg></button>
         </div>
@@ -464,7 +514,7 @@
         <div class="tv">
           <div class="tv-screen" style="position:relative">
             <video data-auto muted loop playsinline preload="none" poster="media/tv-preview-poster.jpg" aria-label="TivEPG on Apple TV, App Store preview">
-              <source src="media/tv-preview.mp4" type="video/mp4" />
+              <source src="media/tv-preview.mp4#t=3" type="video/mp4" />
             </video>
             <button class="sound" type="button" aria-label="Sound" aria-pressed="false"><svg class="off"><use href="#i-muted"/></svg><svg class="on"><use href="#i-sound"/></svg></button>
           </div>
@@ -487,6 +537,8 @@
       </div>
     </div>
   </section>
+
+  </div>
 
   <!-- ============ FAQ ============ -->
   <section class="faq" id="faq">
@@ -569,6 +621,41 @@
     v.muted = !on;
     btn.setAttribute('aria-pressed', String(on));
     if (on) v.play().catch(() => {});
+  }));
+
+  // Device switcher: jump to a platform, highlight the one in view
+  const sw = document.querySelector('.switch');
+  const thumb = sw.querySelector('.switch-thumb');
+  const tabs = [...sw.querySelectorAll('a')];
+  const sections = tabs.map(t => document.getElementById(t.dataset.target));
+  const setActive = id => {
+    tabs.forEach(t => {
+      const on = t.dataset.target === id;
+      t.classList.toggle('active', on);
+      t.setAttribute('aria-selected', String(on));
+      if (on) { thumb.style.width = t.offsetWidth + 'px'; thumb.style.transform = `translateX(${t.offsetLeft}px)`; }
+    });
+    thumb.classList.toggle('on', !!id);
+  };
+  let current = null;
+  const spy = () => {
+    const line = innerHeight * 0.45;
+    let id = null;
+    sections.forEach(sec => { if (sec.getBoundingClientRect().top <= line) id = sec.id; });
+    const last = sections[sections.length - 1].getBoundingClientRect();
+    if (last.bottom < line * 0.5) id = null;
+    if (id !== current) { current = id; setActive(id); }
+  };
+  window.addEventListener('scroll', spy, { passive: true });
+  window.addEventListener('resize', () => setActive(current));
+  spy();
+  document.querySelectorAll('a[data-target]').forEach(a => a.addEventListener('click', e => {
+    const sec = document.getElementById(a.dataset.target);
+    if (!sec) return;
+    e.preventDefault();
+    sec.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+    history.replaceState(null, '', '#' + sec.id);
+    if (typeof gtag === 'function') gtag('event', 'pick_device', { device: sec.id });
   }));
 
   // Screenshot rails
