@@ -34,7 +34,6 @@
   const catTimers = {};
   const localCats = { live: null, vod: null, series: null };
   const catSearch = { live: "", vod: "", series: "" };
-  let localCompetitions = null;
 
   const hid = (() => {
     let id = localStorage.getItem("rh-hid");
@@ -319,7 +318,6 @@
       if (!catTimers[kind]) localCats[kind] = null;
       renderCategories(kind);
     }
-    localCompetitions = null;
     renderSports();
   }
 
@@ -444,12 +442,105 @@
   });
   $("reload-all").addEventListener("click", () => run("reload", {}, $("reload-all")));
 
-  // Categories
+  // ---------- reordering: drag by the ⠿ handle (mouse or touch), or the Top / ▲ / ▼ / Bottom buttons ----------
+  function moveIndex(arr, from, to) {
+    const out = arr.slice();
+    const [x] = out.splice(from, 1);
+    out.splice(to, 0, x);
+    return out;
+  }
+
+  function dragHandle(label) {
+    return el("span", { class: "handle", role: "button", tabindex: "-1", "aria-label": "Drag to reorder " + label, text: "⠿" });
+  }
+
+  function moveButtons(i, n, onMove) {
+    const mk = (text, aria, to, cls) => {
+      const b = el("button", { class: "btn small icon " + (cls || ""), type: "button", "aria-label": aria, title: aria, text });
+      b.disabled = to === i || to < 0 || to >= n;
+      b.addEventListener("click", () => onMove(i, to));
+      return b;
+    };
+    return [mk("⤒", "Move to top", 0), mk("▲", "Move up", i - 1, "fine"), mk("▼", "Move down", i + 1, "fine"), mk("⤓", "Move to bottom", n - 1)];
+  }
+
+  // Rows must each contain a .handle. onMove(from, to) is called once, on release.
+  function sortable(rows, onMove) {
+    rows.forEach((row, from) => {
+      const grip = row.querySelector(".handle");
+      if (!grip) return;
+      grip.addEventListener("pointerdown", (down) => {
+        down.preventDefault();
+        grip.setPointerCapture(down.pointerId);
+        const rects = rows.map((r) => r.getBoundingClientRect());
+        const startY = down.clientY;
+        let scrolled = 0;
+        let to = from;
+        row.classList.add("dragging");
+        let scrollTimer = null;
+        let lastY = startY;
+
+        const update = () => {
+          const dy = lastY - startY + scrolled;
+          row.style.transform = `translateY(${dy}px)`;
+          const centre = rects[from].top + rects[from].height / 2 + dy;
+          to = from;
+          for (let k = 0; k < rects.length; k++) {
+            const mid = rects[k].top + rects[k].height / 2;
+            if (k < from && centre < mid) { to = k; break; }
+            if (k > from && centre > mid) to = k;
+          }
+          const h = rects.length > 1 ? Math.abs(rects[1].top - rects[0].top) : rects[from].height;
+          rows.forEach((r, k) => {
+            if (k === from) return;
+            const shift = (from < to && k > from && k <= to) ? -h : (to < from && k >= to && k < from) ? h : 0;
+            r.style.transform = shift ? `translateY(${shift}px)` : "";
+          });
+        };
+        const autoScroll = () => {
+          const edge = 90;
+          const v = lastY < edge ? -14 : lastY > window.innerHeight - edge ? 14 : 0;
+          if (v) { window.scrollBy(0, v); scrolled += v; update(); }
+        };
+        const onMovePtr = (e) => { lastY = e.clientY; update(); };
+        const finish = () => {
+          clearInterval(scrollTimer);
+          grip.removeEventListener("pointermove", onMovePtr);
+          grip.removeEventListener("pointerup", finish);
+          grip.removeEventListener("pointercancel", finish);
+          rows.forEach((r) => { r.style.transform = ""; r.classList.remove("dragging"); });
+          if (to !== from) onMove(from, to);
+        };
+        scrollTimer = setInterval(autoScroll, 16);
+        grip.addEventListener("pointermove", onMovePtr);
+        grip.addEventListener("pointerup", finish);
+        grip.addEventListener("pointercancel", finish);
+      });
+    });
+  }
+
+  // Categories — laid out like the app's Category settings: a "Display Order" pill (what's
+  // shown, in order) and one pill per playlist (Select All / Clear / Order presets, then every
+  // category to switch on or off).
   const CAT_TITLES = { live: "TV channel", vod: "movie", series: "series" };
+  const SORT_MODES = [{ id: "playlist", title: "Playlist Order" }, { id: "alphabetical", title: "A–Z" }];
+  const catView = { live: "order", vod: "order", series: "order" };
 
   function catsFor(kind) {
     if (!localCats[kind]) localCats[kind] = ((snapshot.categories || {})[kind] || []).map((c) => ({ ...c }));
     return localCats[kind];
+  }
+  const sourceOf = (c) => c.key.slice(0, c.key.indexOf("|"));
+
+  function sourcesFor(kind) {
+    const out = [];
+    const seen = new Map();
+    for (const c of catsFor(kind)) {
+      const id = sourceOf(c);
+      if (!seen.has(id)) { seen.set(id, { id, name: c.source || "Playlist", cats: [] }); out.push(seen.get(id)); }
+      seen.get(id).cats.push(c);
+    }
+    return out;
   }
 
   function queueCategorySave(kind) {
@@ -458,16 +549,39 @@
       const shown = catsFor(kind).filter((c) => c.shown).map((c) => c.key);
       const r = await command("setCategories", { kind, shown });
       catTimers[kind] = null;
-      if (!r.ok) toast(r.message || "Couldn't save that.", true);
-      else toast("Saved on their device.");
+      toast(r.ok ? "Saved on their device." : (r.message || "Couldn't save that."), !r.ok);
     }, 700);
+  }
+
+  // Switching one on adds it at the end of its playlist's block, as the app does.
+  function setShown(kind, cats, on) {
+    const all = catsFor(kind);
+    for (const c of cats) {
+      if (c.shown === on) continue;
+      c.shown = on;
+      if (on) {
+        const src = sourceOf(c);
+        const shownOrder = all.filter((x) => x.shown && x !== c);
+        let at = -1;
+        shownOrder.forEach((x, i) => { if (sourceOf(x) === src) at = i; });
+        shownOrder.splice(at === -1 ? shownOrder.length : at + 1, 0, c);
+        localCats[kind] = [...shownOrder, ...all.filter((x) => !x.shown)];
+      }
+    }
+    renderCategories(kind);
+    queueCategorySave(kind);
+  }
+
+  function pill(label, badge, active, onClick) {
+    const b = el("button", { class: "subtab" + (active ? " active" : ""), type: "button" }, label,
+      badge !== null ? el("span", { class: "subtab-badge", text: String(badge) }) : null);
+    b.addEventListener("click", onClick);
+    return b;
   }
 
   function renderCategories(kind) {
     const panel = $("tab-" + kind);
     const cats = catsFor(kind);
-    const shown = cats.filter((c) => c.shown);
-    const hidden = cats.filter((c) => !c.shown);
     const word = CAT_TITLES[kind];
     const keepFocus = document.activeElement && document.activeElement.dataset.search === kind;
     panel.replaceChildren();
@@ -477,125 +591,223 @@
         text: `No ${word} categories yet. Add a playlist first, or wait for their device to finish loading.` }));
       return;
     }
-    panel.append(el("p", { class: "hint",
-      text: `Choose which ${word} categories they see, and the order they appear in. Changes save by themselves.` }));
+    const sources = sourcesFor(kind);
+    if (catView[kind] !== "order" && !sources.some((s) => s.id === catView[kind])) catView[kind] = "order";
 
-    const update = () => { renderCategories(kind); queueCategorySave(kind); };
-    const move = (cat, delta) => {
-      const all = catsFor(kind);
-      const order = all.filter((c) => c.shown);
-      const i = order.indexOf(cat);
-      const j = i + delta;
-      if (j < 0 || j >= order.length) return;
-      [order[i], order[j]] = [order[j], order[i]];
+    const bar = el("div", { class: "subtabs" },
+      pill("Display Order", cats.filter((c) => c.shown).length, catView[kind] === "order", () => { catView[kind] = "order"; renderCategories(kind); }),
+      sources.map((s) => pill(s.name, s.cats.filter((c) => c.shown).length, catView[kind] === s.id,
+        () => { catView[kind] = s.id; renderCategories(kind); })));
+    panel.append(bar);
+
+    if (catView[kind] === "order") {
+      renderDisplayOrder(kind, panel);
+    } else {
+      renderSource(kind, panel, sources.find((s) => s.id === catView[kind]));
+    }
+    if (keepFocus) {
+      const search = panel.querySelector("input[data-search]");
+      if (search) { search.focus(); search.setSelectionRange(search.value.length, search.value.length); }
+    }
+  }
+
+  function renderDisplayOrder(kind, panel) {
+    const all = catsFor(kind);
+    const shown = all.filter((c) => c.shown);
+    panel.append(el("p", { class: "hint", text: "Drag ⠿ to reorder, or use ⤒ top / ⤓ bottom · Remove hides it" }));
+    const list = el("div", { class: "list" });
+    if (!shown.length) list.append(el("p", { class: "empty", text: "Nothing is switched on. Pick categories from a playlist above." }));
+    const move = (from, to) => {
+      const order = moveIndex(all.filter((c) => c.shown), from, to);
       localCats[kind] = [...order, ...all.filter((c) => !c.shown)];
-      update();
+      renderCategories(kind);
+      queueCategorySave(kind);
     };
-
-    // Shown column
-    const showAll = el("button", { class: "btn small", type: "button", text: "Show all" });
-    showAll.addEventListener("click", () => { catsFor(kind).forEach((c) => (c.shown = true)); update(); });
-    const hideAll = el("button", { class: "btn small", type: "button", text: "Hide all" });
-    hideAll.addEventListener("click", () => {
-      if (confirm(`Hide every ${word} category?`)) { catsFor(kind).forEach((c) => (c.shown = false)); update(); }
-    });
-
-    const shownList = el("div", { class: "list" });
-    if (!shown.length) shownList.append(el("p", { class: "empty", text: "Nothing is showing. Pick some from the list." }));
-    shown.forEach((c, index) => {
-      const up = el("button", { class: "btn small icon", type: "button", title: "Move up", "aria-label": "Move up", text: "↑" });
-      const down = el("button", { class: "btn small icon", type: "button", title: "Move down", "aria-label": "Move down", text: "↓" });
-      const hide = el("button", { class: "btn small", type: "button", text: "Hide" });
-      up.disabled = index === 0;
-      down.disabled = index === shown.length - 1;
-      up.addEventListener("click", () => move(c, -1));
-      down.addEventListener("click", () => move(c, 1));
-      hide.addEventListener("click", () => { c.shown = false; update(); });
-      shownList.append(el("div", { class: "item" },
-        el("span", { class: "num", text: String(index + 1) }),
+    const rows = shown.map((c, i) => {
+      const remove = el("button", { class: "btn small danger", type: "button", text: "Remove" });
+      remove.addEventListener("click", () => setShown(kind, [c], false));
+      const row = el("div", { class: "item" },
+        dragHandle(c.name),
+        el("span", { class: "num", text: String(i + 1) }),
         el("div", { class: "grow" }, el("div", { class: "title", text: c.name }), el("div", { class: "sub", text: c.source })),
-        up, down, hide));
+        ...moveButtons(i, shown.length, move), remove);
+      list.append(row);
+      return row;
     });
+    sortable(rows, move);
+    panel.append(list);
+  }
 
-    // Hidden column, searchable (a playlist can have thousands)
+  function renderSource(kind, panel, source) {
     const search = el("input", { class: "search", placeholder: "Search categories", value: catSearch[kind] });
     search.dataset.search = kind;
     search.addEventListener("input", () => { catSearch[kind] = search.value; renderCategories(kind); });
-    const q = catSearch[kind].trim().toLowerCase();
-    const matches = hidden.filter((c) => !q || c.name.toLowerCase().includes(q) || (c.source || "").toLowerCase().includes(q));
-    const LIMIT = 200;
-    const hiddenList = el("div", { class: "list" });
-    if (!hidden.length) hiddenList.append(el("p", { class: "empty", text: "Everything is showing." }));
-    else if (!matches.length) hiddenList.append(el("p", { class: "empty", text: "No matches." }));
-    for (const c of matches.slice(0, LIMIT)) {
-      const add = el("button", { class: "btn small", type: "button", text: "Show" });
-      add.addEventListener("click", () => { c.shown = true; update(); });
-      hiddenList.append(el("div", { class: "item dim" },
-        el("div", { class: "grow" }, el("div", { class: "title", text: c.name }), el("div", { class: "sub", text: c.source })),
-        add));
-    }
-    if (matches.length > LIMIT) hiddenList.append(el("p", { class: "more", text: `${matches.length - LIMIT} more. Search to find them.` }));
 
-    panel.append(el("div", { class: "cat-columns" },
-      el("div", {},
-        el("div", { class: "cat-head" }, el("h3", { text: `Showing (${shown.length})` }), el("div", { class: "row-actions" }, showAll, hideAll)),
-        shownList),
-      el("div", {},
-        el("div", { class: "cat-head" }, el("h3", { text: `Hidden (${hidden.length})` })),
-        search, hiddenList)));
-
-    if (keepFocus) { search.focus(); search.setSelectionRange(search.value.length, search.value.length); }
-  }
-
-  // Sports Hub
-  function renderSports() {
-    const sports = snapshot.sports || {};
-    if (!localCompetitions) localCompetitions = (sports.competitions || []).map((c) => ({ ...c }));
-    const comps = localCompetitions;
-    const list = $("competition-list");
-    list.replaceChildren();
-    if (!comps.length) list.append(el("p", { class: "empty", text: "The Sports Hub hasn't loaded on their device yet." }));
-
-    let saveTimer = null;
-    const save = () => {
-      clearTimeout(saveTimer);
-      saveTimer = setTimeout(async () => {
-        const r = await command("setCompetitions", { items: comps.map((c) => ({ code: c.code, enabled: !!c.enabled })) });
-        toast(r.ok ? "Saved on their device." : (r.message || "Couldn't save that."), !r.ok);
-      }, 600);
-    };
-
-    comps.forEach((c, index) => {
-      const box = el("input", { type: "checkbox", "aria-label": "Show " + c.name });
-      box.checked = !!c.enabled;
-      box.addEventListener("change", () => { c.enabled = box.checked; save(); });
-      const up = el("button", { class: "btn small icon", type: "button", "aria-label": "Move up", text: "↑" });
-      const down = el("button", { class: "btn small icon", type: "button", "aria-label": "Move down", text: "↓" });
-      up.disabled = index === 0;
-      down.disabled = index === comps.length - 1;
-      const swap = (d) => { [comps[index], comps[index + d]] = [comps[index + d], comps[index]]; renderSports(); save(); };
-      up.addEventListener("click", () => swap(-1));
-      down.addEventListener("click", () => swap(1));
-      list.append(el("div", { class: "item" + (c.enabled ? "" : " dim") },
-        el("label", { class: "switch" }, box, el("span")),
-        el("div", { class: "grow" }, el("div", { class: "title", text: c.name }), c.group ? el("div", { class: "sub", text: c.group }) : null),
-        up, down));
+    const selectAll = el("button", { class: "btn small", type: "button", text: "✓ Select All" });
+    selectAll.addEventListener("click", () => setShown(kind, source.cats, true));
+    const clear = el("button", { class: "btn small danger", type: "button", text: "✕ Clear" });
+    clear.addEventListener("click", () => {
+      if (confirm(`Switch off every ${source.name} category?`)) setShown(kind, source.cats, false);
     });
 
-    const teams = [...(sports.favouriteTeams || [])];
-    const leagues = [...(sports.favouriteLeagues || [])];
-    const saveFavs = () => run("setFavourites", { teams, leagues });
-    const favList = (target, items, emptyText) => {
-      target.replaceChildren();
-      if (!items.length) target.append(el("p", { class: "empty", text: emptyText }));
-      items.forEach((name, i) => {
-        const remove = el("button", { class: "btn small", type: "button", text: "Remove" });
-        remove.addEventListener("click", () => { items.splice(i, 1); favList(target, items, emptyText); saveFavs(); });
-        target.append(el("div", { class: "item" }, el("div", { class: "grow" }, el("div", { class: "title", text: name })), remove));
-      });
+    const mode = ((snapshot.categorySortModes || {})[kind] || {})[source.id];
+    const sortRow = el("div", { class: "sort-row" }, el("span", { class: "muted small-label", text: "Order" }),
+      SORT_MODES.map((m) => {
+        const b = el("button", { class: "subtab" + (mode === m.id ? " active" : ""), type: "button", text: m.title });
+        b.addEventListener("click", async () => {
+          b.disabled = true;
+          const r = await command("setCategorySort", { kind, server: source.id, mode: m.id });
+          b.disabled = false;
+          toast(r.ok ? `${source.name} is now in ${m.title === "A–Z" ? "A–Z" : "playlist"} order.` : (r.message || "Couldn't do that."), !r.ok);
+        });
+        return b;
+      }));
+
+    panel.append(
+      el("div", { class: "source-tools" }, search, el("div", { class: "row-actions tight" }, selectAll, clear)),
+      sortRow);
+
+    const q = catSearch[kind].trim().toLowerCase();
+    const matches = source.cats.filter((c) => !q || c.name.toLowerCase().includes(q));
+    const LIMIT = 300;
+    const grid = el("div", { class: "cat-grid" });
+    if (!matches.length) grid.append(el("p", { class: "empty", text: q ? `No categories match “${catSearch[kind]}”` : "No categories." }));
+    for (const c of matches.slice(0, LIMIT)) {
+      const tile = el("button", { class: "cat-tile" + (c.shown ? " on" : ""), type: "button", "aria-pressed": c.shown ? "true" : "false" },
+        el("span", { class: "tick", text: c.shown ? "✓" : "" }), el("span", { class: "cat-name", text: c.name }));
+      tile.addEventListener("click", () => setShown(kind, [c], !c.shown));
+      grid.append(tile);
+    }
+    panel.append(grid);
+    if (matches.length > LIMIT) panel.append(el("p", { class: "more", text: `${matches.length - LIMIT} more. Search to find them.` }));
+  }
+
+  // Sports Hub — the same page as Settings › Manage Sports: All Sports, Your Hub, then each
+  // sport with its competitions. Every switch runs the same code on their device.
+  const sportsOpen = new Set();
+  let sportsReorder = false;
+
+  function hubSwitch(state, label, onFlip) {
+    const b = el("button", { class: "hub-switch " + state, type: "button", role: "switch",
+      "aria-checked": state === "on" ? "true" : state === "mixed" ? "mixed" : "false", "aria-label": label });
+    b.append(el("span"));
+    b.addEventListener("click", async () => { b.disabled = true; await onFlip(); b.disabled = false; });
+    return b;
+  }
+
+  function star(item) {
+    if (!item.favouriteID) return null;
+    const b = el("button", { class: "star" + (item.favourite ? " on" : ""), type: "button",
+      "aria-label": (item.favourite ? "Unfavourite " : "Favourite ") + item.name, text: item.favourite ? "★" : "☆" });
+    b.addEventListener("click", () => run("sportsFavouriteCompetition", { id: item.favouriteID, favourite: !item.favourite }));
+    return b;
+  }
+
+  function hubRow({ title, subtitle, subtitleClass, depth = 0, expandKey, trailing, lead }) {
+    const isOpen = expandKey && sportsOpen.has(expandKey);
+    const label = el("div", { class: "grow" },
+      el("div", { class: "title", text: title }),
+      subtitle ? el("div", { class: "sub" + (subtitleClass ? " " + subtitleClass : ""), text: subtitle }) : null);
+    let main = label;
+    if (expandKey) {
+      main = el("button", { class: "row-expander grow", type: "button", "aria-expanded": isOpen ? "true" : "false" },
+        label, el("span", { class: "chev" + (isOpen ? " open" : ""), text: "›" }));
+      main.addEventListener("click", () => { isOpen ? sportsOpen.delete(expandKey) : sportsOpen.add(expandKey); renderSports(); });
+    }
+    return el("div", { class: "hub-row depth-" + depth }, lead || null, main, ...(trailing || []));
+  }
+
+  function itemRows(item, depth) {
+    const rows = [];
+    if (item.kind === "competition") {
+      rows.push(hubRow({ title: item.name, subtitle: item.subtitle, depth,
+        subtitleClass: /favourited/.test(item.subtitle) ? "gold" : "",
+        trailing: [star(item), hubSwitch(item.state, "Show " + item.name,
+          () => run("sportsToggleCompetition", { code: item.code, competition: item.name }))] }));
+      return rows;
+    }
+    const key = item.competitions ? "tab:" + item.code : null;
+    rows.push(hubRow({ title: item.name, subtitle: item.loading ? "Loading…" : item.subtitle, depth, expandKey: key,
+      trailing: [star(item), hubSwitch(item.state, "Show " + item.name,
+        () => run("sportsShowAll", { codes: [item.code], enabled: item.state !== "on", label: item.name }))] }));
+    if (key && sportsOpen.has(key)) for (const c of item.competitions) rows.push(...itemRows(c, depth + 1));
+    return rows;
+  }
+
+  function renderSports() {
+    const panel = $("tab-sports");
+    const sports = snapshot.sports || {};
+    panel.replaceChildren();
+    if (!sports.groups) {
+      panel.append(el("p", { class: "empty", text: "Their device needs the latest TivEPG update to change the Sports Hub from here." }));
+      return;
+    }
+
+    const master = sports.master || {};
+    panel.append(el("div", { class: "hub-card" },
+      hubRow({ title: "All Sports", subtitle: master.subtitle,
+        trailing: [hubSwitch(master.state || "off", "Show every league in the Sports Hub",
+          () => run("sportsShowAll", { codes: master.codes || [], enabled: master.state !== "on", label: "every sport" }))] })));
+
+    panel.append(el("h4", { class: "hub-section", text: "Your Hub" }));
+    panel.append(el("div", { class: "hub-card" }, (sports.builtIns || []).map((b) =>
+      hubRow({ title: b.name, subtitle: b.subtitle,
+        trailing: [hubSwitch(b.enabled ? "on" : "off", "Show " + b.name, () => run("sportsToggleBuiltIn", { code: b.code }))] }))));
+
+    const head = el("div", { class: "hub-section-row" }, el("h4", { class: "hub-section", text: sports.grouped ? "Sports" : "Sports Hub Tabs" }));
+    if (sports.grouped) {
+      const reorder = el("button", { class: "btn small", type: "button", text: sportsReorder ? "Done Reordering" : "Reorder Sports" });
+      reorder.addEventListener("click", () => { sportsReorder = !sportsReorder; renderSports(); });
+      head.append(reorder);
+    }
+    panel.append(head);
+
+    const groups = sports.groups;
+    const card = el("div", { class: "hub-card" });
+    const sportRowsForDrag = [];
+    // Moves show straight away; their device saves the same order (Manage Sports' reorder).
+    const moveSport = (from, to) => {
+      sports.groups = moveIndex(groups, from, to);
+      renderSports();
+      run("sportsOrder", { groups: sports.groups.map((x) => x.id) });
     };
-    favList($("team-list"), teams, "No favourite teams. They can add them by pressing the star on a team in the Sports Hub.");
-    favList($("league-list"), leagues, "No favourite competitions.");
+    groups.forEach((g, i) => {
+      const key = "sport:" + g.id;
+      let trailing = [hubSwitch(g.state, "Show " + g.name,
+        () => run("sportsShowAll", { codes: g.codes, enabled: g.state !== "on", label: g.name }))];
+      if (sportsReorder) trailing = moveButtons(i, groups.length, moveSport);
+      const row = hubRow({ title: g.name, subtitle: g.subtitle, expandKey: sportsReorder ? null : key, trailing,
+        lead: sportsReorder ? dragHandle(g.name) : null });
+      sportRowsForDrag.push(row);
+      card.append(row);
+      if (!sportsReorder && sportsOpen.has(key)) for (const item of g.items) card.append(...itemRows(item, 1));
+    });
+    panel.append(card);
+    if (sportsReorder) sortable(sportRowsForDrag, moveSport);
+
+    // Favourites, as the Favourites page lists them.
+    panel.append(el("h4", { class: "hub-section", text: "Favourite Competitions" }));
+    const comps = el("div", { class: "hub-card" });
+    if (!(sports.favouriteCompetitions || []).length) comps.append(el("p", { class: "empty flat", text: "No favourite competitions. Tap ☆ on a competition above." }));
+    for (const c of sports.favouriteCompetitions || []) {
+      const remove = el("button", { class: "btn small", type: "button", text: "Remove" });
+      remove.addEventListener("click", () => run("sportsFavouriteCompetition", { id: c.id, favourite: false }));
+      comps.append(hubRow({ title: c.name, trailing: [remove] }));
+    }
+    panel.append(comps);
+
+    panel.append(el("h4", { class: "hub-section", text: "Favourite Teams" }));
+    const teams = el("div", { class: "hub-card" });
+    if (!(sports.favouriteTeams || []).length) teams.append(el("p", { class: "empty flat", text: "No favourite teams. They can star a team in the Sports Hub." }));
+    for (const name of sports.favouriteTeams || []) {
+      const remove = el("button", { class: "btn small", type: "button", text: "Remove" });
+      remove.addEventListener("click", () => run("sportsRemoveTeam", { name }));
+      teams.append(hubRow({ title: name, trailing: [remove] }));
+    }
+    panel.append(teams);
+
+    panel.append(el("p", { class: "hint foot-note",
+      text: "A switch shows or hides that part of the Sports Hub - blue means only some of it is shown. Your favourites always appear in Favourites, whatever is hidden here." }));
   }
 
   // ---------- start ----------
