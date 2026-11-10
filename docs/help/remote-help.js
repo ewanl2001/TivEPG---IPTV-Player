@@ -247,7 +247,11 @@
       if (resolve) { pending.delete(String(msg.req)); resolve(msg); }
     } else if (msg.type === "snapshot") {
       snapshot = msg.snapshot;
-      if ($("screen-help").hidden) { show("help"); history.replaceState({ section: null }, ""); showTab(null, false); }
+      if ($("screen-help").hidden) {
+        show("help"); history.replaceState({ section: null }, ""); showTab(null, false);
+        // Opened from the app's "Connect to …": straight to the Remote.
+        if (ownDevice) showTab("remote");
+      }
       render();
     }
   }
@@ -262,7 +266,7 @@
     }
     code = digits;
     helperName = $("name").value.trim().slice(0, 30);
-    if (helperName) localStorage.setItem("rh-name", helperName);
+    if (helperName && !ownDevice) localStorage.setItem("rh-name", helperName);
     $("join-error").hidden = true;
     $("join").disabled = true;
     ended = false;
@@ -3777,13 +3781,21 @@
   }
 
   // ---------- start ----------
-  const fromLink = location.hash.replace(/\D/g, "").slice(0, 6);
+  // "#123456" = a shared link (they still type their name); "#123456;own;From" = the app's own
+  // "Connect to …" on the same Apple account: join at once, as From, and open the Remote.
+  const hashParts = decodeURIComponent(location.hash.slice(1)).split(";");
+  const fromLink = (hashParts[0] || "").replace(/\D/g, "").slice(0, 6);
+  const ownDevice = fromLink.length === 6 && hashParts[1] === "own";
   if (fromLink.length === 6) $("code").value = fromLink.slice(0, 3) + " " + fromLink.slice(3);
   $("name").value = localStorage.getItem("rh-name") || "";
   if (!window.crypto || !crypto.subtle || !("WebSocket" in window)) {
     $("join-error").textContent = "This browser is too old for Remote Help. Try the latest Safari, Chrome, Edge or Firefox.";
     $("join-error").hidden = false;
     $("join").disabled = true;
+  } else if (ownDevice) {
+    $("name").value = (hashParts[2] || "").slice(0, 30) || $("name").value || "Your other device";
+    document.body.classList.add("own-device");
+    startJoin();
   } else if (fromLink.length === 6) {
     $("name").focus();
   } else {
