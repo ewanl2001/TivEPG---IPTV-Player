@@ -2966,6 +2966,7 @@
     if (currentTab === "remote" && remote.mode === "sports" && !mc.open && !busy("tab-remote")) renderRemote();
   });
   const UPCOMING_DEST = { code: "UPCOMING", name: "Upcoming", place: true };
+  const HIGHLIGHTS_DEST = { code: "HIGHLIGHTS", name: "Highlights", place: true };
   const hubKey = (d) => d.code + "|" + (d.competition || "");
   const hubSetting = (id, fallback) => {
     const s = (snapshot.settings || []).find((x) => x.id === id);
@@ -3032,9 +3033,20 @@
     navPush();
     if (changed) {
       sp.events = null; sp.table = null; sp.tableTried = false; sp.filter = "All";
-      if (dest.code === "UPCOMING" || sp.view === "table") sp.view = "fixtures";
+      if (dest.place || sp.view === "table") sp.view = "fixtures";
     }
     renderRemote();
+    if (dest.code === "HIGHLIGHTS") {
+      const loadHl = async () => {
+        const r = await command("hubHighlights", {});
+        if (!sp.dest || sp.dest.code !== "HIGHLIGHTS") return;
+        sp.hl = r.ok ? r : { error: r.message || "Their app doesn't have Highlights on the Remote yet. Update TivEPG on it." };
+        if (!busy("tab-remote") && !sp.picker && !sp.event) renderRemote();
+      };
+      await loadHl();
+      remoteRefreshEvery(5 * 60000, loadHl);
+      return;
+    }
     let round = 0;
     const load = async () => {
       const key = hubKey(dest);
@@ -3043,7 +3055,7 @@
       const wantsTable = dest.code !== "UPCOMING" && !dest.all && round % 5 === 0;
       round++;
       const [ev, tick, table] = await Promise.all([
-        command("hubEvents", { code: dest.code, competition: dest.competition }),
+        command("hubEvents", { code: dest.code, competition: dest.competition, ...(sp.view === "results" ? { view: "results" } : {}) }),
         wantsTicker ? command("hubEvents", { code: "UPCOMING" }) : null,
         wantsTable ? command("hubTable", { code: dest.code, competition: dest.competition }) : null,
       ]);
@@ -3126,6 +3138,7 @@
 
     if (hubSetting("sportsHubShowLiveTicker", true) !== false && sp.ticker && sp.ticker.length) hub.append(hubTicker(sp.ticker));
     hub.append(hubHeader(tv));
+    if (sp.dest.code === "HIGHLIGHTS") { renderHighlights(hub, tv); if (sp.picker) hub.append(hubPicker(tv)); return; }
     const dest = sp.dest;
     const evs = sp.events;
     const hasTable = !!(sp.table && hubTableGroups(sp.table).length);
@@ -3149,7 +3162,11 @@
       const shelf = el("div", { class: "hub-shelf hub-tabs", role: "tablist" });
       for (const [id, title] of tabs) {
         const b = el("button", { class: "hub-tab" + (sp.view === id ? " on" : ""), type: "button", role: "tab", "aria-selected": sp.view === id ? "true" : "false", text: title });
-        b.addEventListener("click", () => { sp.view = id; renderRemote(); });
+        b.addEventListener("click", () => {
+          const reload = (id === "results") !== (sp.view === "results");
+          sp.view = id;
+          if (reload) { sp.events = null; hubOpen(dest); } else renderRemote();
+        });
         shelf.append(b);
       }
       hub.append(shelf);
@@ -3213,6 +3230,12 @@
           isLive ? el("span", { class: "hub-pulse" }) : null, el("span", { text: h })));
       }
       list.append(tv ? hubCardTV(ev, showCrest) : hubCardPhone(ev, showCrest));
+      if (ev.highlight && ev.highlight.clips && ev.highlight.clips.length) {
+        const b = el("button", { class: "hl-result-btn", type: "button" }, hubPlayIcon(), el("span", { text: "Highlights" }),
+          el("span", { class: "hl-result-src", text: ev.highlight.clips[0].label || "" }));
+        b.addEventListener("click", () => openClipSheet(ev.highlight));
+        list.append(b);
+      }
     }
   }
 
@@ -3274,7 +3297,7 @@
     const live = (sp.events || []).filter((e) => e.state === "live").length;
     const place = dest.code === "UPCOMING";
     const logo = dest.logo || (!place && (sp.events || []).find((e) => e.leagueLogo) || {}).leagueLogo;
-    const crest = place ? el("span", { class: "hub-place-ico", "aria-hidden": "true" }, hubCalendarIcon()) : hubCrest(logo, dest.name, "head");
+    const crest = place ? el("span", { class: "hub-place-ico", "aria-hidden": "true" }, dest.code === "HIGHLIGHTS" ? hubPlayIcon() : hubCalendarIcon()) : hubCrest(logo, dest.name, "head");
     const eyebrow = (place ? "Sports Hub" : dest.sport || "Sports Hub").toUpperCase() + (live ? ` · ${live} LIVE` : "");
     const title = el("button", { class: "hub-title", type: "button", "aria-haspopup": "dialog" },
       el("span", { class: "hub-title-text", text: dest.label || dest.name }), el("span", { class: "hub-caret", text: "▾" }));
@@ -3282,12 +3305,16 @@
     const up = el("button", { class: "hub-seg" + (place ? " on" : ""), type: "button", title: "Upcoming" },
       hubCalendarIcon(), el("span", { text: "Upcoming" }));
     up.addEventListener("click", () => hubOpen(UPCOMING_DEST));
+    const hlOn = dest.code === "HIGHLIGHTS";
+    const hl = el("button", { class: "hub-seg" + (hlOn ? " on" : ""), type: "button", title: "Highlights" },
+      hubPlayIcon(), el("span", { text: "Highlights" }));
+    hl.addEventListener("click", () => hubOpen(HIGHLIGHTS_DEST));
     return el("div", { class: "hub-head" },
       crest,
       el("div", { class: "hub-head-text" },
         el("div", { class: "hub-eyebrow" + (live ? " live" : ""), text: eyebrow }),
         title),
-      el("div", { class: "hub-places" }, up),
+      el("div", { class: "hub-places" }, up, hl),
       tv ? el("div", { class: "hub-clock", text: new Date().toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) }) : null);
   }
   function hubCalendarIcon() {
@@ -3295,6 +3322,137 @@
     s.setAttribute("viewBox", "0 0 24 24");
     s.innerHTML = '<rect x="3.5" y="5" width="17" height="15.5" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3.5 10h17M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="15" r="1.6" fill="currentColor"/>';
     return s;
+  }
+
+  function hubPlayIcon() {
+    const s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    s.setAttribute("viewBox", "0 0 24 24");
+    s.innerHTML = '<rect x="3" y="5" width="18" height="14" rx="3.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M10 9.2v5.6l4.8-2.8z" fill="currentColor"/>';
+    return s;
+  }
+
+  // ----- Highlights (the tvOS Highlights tab) -----
+  // Billboard on top (the picked game: kit-split art, crests, score bug, its sources), then
+  // rails: LATEST, YOUR TEAMS, one per competition in their hub's order. Cards are the app's
+  // club art (kit split + crests + score bug), NEW on the left edge, the league tag on the
+  // mixed rails. Picking a card moves it to the billboard, as focus does on the TV.
+  const hlColor = (c, fallback) => {
+    const v = String(c || "").replace(/^#/, "");
+    return /^[0-9a-f]{6}$/i.test(v) ? "#" + v : fallback;
+  };
+  function hlKitArt(h, size) {
+    const box = el("div", { class: "hl-art hl-art-" + size });
+    if (h.event) {
+      box.classList.add("event");
+      box.append(hubCrest(h.leagueLogo, h.league, "hl-crest"));
+      return box;
+    }
+    const left = el("span", { class: "hl-kit left" }), right = el("span", { class: "hl-kit right" });
+    left.style.background = hlColor(h.home.color, "#2b3a55");
+    right.style.background = hlColor(h.away.color, "#55402b");
+    box.append(left, right,
+      el("span", { class: "hl-crest-slot l" }, hubCrest(h.home.logo, h.home.name, "hl-crest")),
+      el("span", { class: "hl-crest-slot r" }, hubCrest(h.away.logo, h.away.name, "hl-crest")));
+    if (h.score) box.append(el("span", { class: "hl-bug", text: h.score }));
+    return box;
+  }
+  const hlWatched = (h) => (h.clips || []).some((c) => c.watched);
+  function hlCard(h, tagLeague) {
+    const sp = remote.sports;
+    const picked = sp.hlPick && sp.hlPick.id === h.id;
+    const card = el("button", { class: "hl-card" + (picked ? " picked" : "") + (hlWatched(h) ? " watched" : ""), type: "button" });
+    const art = hlKitArt(h, "card");
+    if (h.new && !hlWatched(h)) art.append(el("span", { class: "hl-new", text: "NEW" }));
+    if (tagLeague && (h.short || h.league)) art.append(el("span", { class: "hl-tag", text: h.short || h.league }));
+    if (hlWatched(h)) art.append(el("span", { class: "hl-tick", text: "✓" }));
+    card.append(art,
+      el("span", { class: "hl-cap" }, el("span", { class: "hl-cap-title", text: h.title }),
+        el("span", { class: "hl-cap-sub", text: [dayText(h.kickoff), h.venue].filter(Boolean).join(" · ") })));
+    card.addEventListener("click", () => {
+      sp.hlPick = h;
+      renderRemote();
+      const bb = document.querySelector(".hl-billboard");
+      if (bb) bb.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+    return card;
+  }
+  function hlRail(title, sub, items, tagLeague, logo) {
+    if (!items || !items.length) return null;
+    const rail = el("div", { class: "hl-rail-track" });
+    let day = "";
+    for (const h of items) {
+      const d = dayText(h.kickoff);
+      if (!tagLeague && d !== day) { day = d; rail.append(el("span", { class: "hl-spine", text: d.toUpperCase() })); }
+      rail.append(hlCard(h, tagLeague));
+    }
+    return el("section", { class: "hl-rail" },
+      el("div", { class: "hl-rail-head" }, logo ? hubCrest(logo, title, "xs") : null,
+        el("span", { class: "hl-rail-title", text: title }), sub ? el("span", { class: "hl-rail-sub", text: sub }) : null),
+      rail);
+  }
+  function hlBillboard(h) {
+    const bb = el("div", { class: "hl-billboard" });
+    const wash = el("div", { class: "hl-bb-wash" });
+    wash.style.setProperty("--hl-home", hlColor(h.home && h.home.color, "#20304a"));
+    wash.style.setProperty("--hl-away", hlColor(h.away && h.away.color, "#3a2a20"));
+    bb.append(wash);
+    const plays = el("div", { class: "hl-bb-sources" });
+    for (const c of h.clips || []) plays.append(clipButtons(c, h));
+    bb.append(el("div", { class: "hl-bb-body" },
+      hlKitArt(h, "hero"),
+      el("div", { class: "hl-bb-text" },
+        el("div", { class: "hl-bb-league" }, hubCrest(h.leagueLogo, h.league, "xs"), el("span", { text: (h.league || "").toUpperCase() })),
+        el("div", { class: "hl-bb-title", text: h.title }),
+        el("div", { class: "hl-bb-sub", text: [h.event ? null : h.score ? "FULL TIME" : null, dayText(h.kickoff), h.venue].filter(Boolean).join(" · ") }),
+        plays)));
+    return bb;
+  }
+  function clipButtons(c, h) {
+    const tvBtn = el("button", { class: "btn small btn-white", type: "button", text: "▶ Play on TV" });
+    tvBtn.addEventListener("click", () => run("playHighlight", { url: c.url }, tvBtn));
+    const here = c.noEmbed || !c.id ? null : el("button", { class: "btn small", type: "button", text: "Play here" });
+    if (here) here.addEventListener("click", () => playClipHere(c, h));
+    return el("div", { class: "hl-src" }, el("span", { class: "hl-src-label", text: (c.watched ? "✓ " : "") + (c.label || "Highlights") }), tvBtn, here);
+  }
+  // Results' "Highlights": the same sources in a sheet.
+  function openClipSheet(h) {
+    const scrim = el("div", { class: "hl-sheet-scrim" });
+    const close = () => scrim.remove();
+    scrim.addEventListener("click", (e) => { if (e.target === scrim) close(); });
+    const x = el("button", { class: "btn small icon", type: "button", "aria-label": "Close", text: "✕" });
+    x.addEventListener("click", close);
+    scrim.append(el("div", { class: "hl-sheet" }, el("div", { class: "hl-sheet-head" }, el("strong", { text: h.title }), x),
+      ...(h.clips || []).map((c) => clipButtons(c, h))));
+    document.body.append(scrim);
+  }
+  // YouTube's own embedded player (privacy-enhanced domain), never a re-hosted copy.
+  function playClipHere(c, h) {
+    const scrim = el("div", { class: "hl-player-scrim" });
+    const close = () => scrim.remove();
+    const x = el("button", { class: "btn small icon hl-player-x", type: "button", "aria-label": "Close", text: "✕" });
+    x.addEventListener("click", close);
+    scrim.addEventListener("click", (e) => { if (e.target === scrim) close(); });
+    const frame = el("iframe", { class: "hl-player", src: `https://www.youtube-nocookie.com/embed/${encodeURIComponent(c.id)}?autoplay=1&rel=0&playsinline=1`,
+      title: h.title, allow: "autoplay; encrypted-media; picture-in-picture; fullscreen", allowfullscreen: "", referrerpolicy: "strict-origin-when-cross-origin" });
+    scrim.append(el("div", { class: "hl-player-box" }, frame, x));
+    document.body.append(scrim);
+  }
+  function renderHighlights(hub, tv) {
+    const sp = remote.sports;
+    const d = sp.hl;
+    if (!d) { hub.append(hubSkeleton(tv)); return; }
+    if (d.error) { hub.append(hubEmpty("Highlights aren't available", d.error)); return; }
+    const all = [...(d.latest || []), ...(d.favourites || []), ...(d.rows || []).flatMap((r) => r.items)];
+    if (!all.length) { hub.append(hubEmpty("No highlights yet", "Official highlights from their competitions show here a little after full time.")); return; }
+    if (!sp.hlPick || !all.some((h) => h.id === sp.hlPick.id)) sp.hlPick = all[0];
+    else sp.hlPick = all.find((h) => h.id === sp.hlPick.id);
+    const page = el("div", { class: "hl-page" + (tv ? " tv" : "") });
+    page.append(hlBillboard(sp.hlPick));
+    const newest = (d.latest || [])[0];
+    page.append(hlRail("Latest", newest ? "Newest from your competitions" : "", d.latest, true));
+    page.append(hlRail("Your Teams", "", d.favourites, true));
+    for (const r of d.rows || []) page.append(hlRail(r.title, `${r.group ? r.group + " · " : ""}${r.count} game${r.count === 1 ? "" : "s"}`, r.items, false, r.logo));
+    hub.append(page);
   }
 
   // ----- Cards (StunningFixtureCard) -----
