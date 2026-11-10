@@ -1874,183 +1874,272 @@
   const liveColor = (c, f) => { const v = String(c || "").replace(/^#/, ""); return /^[0-9a-f]{6}$/i.test(v) ? "#" + v : f; };
   const liveShortLeague = (l) => { const s = String(l || ""); const w = s.split(/\s+/); return w.length > 1 ? w.map((x) => x[0]).join("").slice(0, 4).toUpperCase() : s.slice(0, 4).toUpperCase(); };
 
+  // ---------- Teletext ----------
+  // The Live tab is a teletext service: a 40-column page, page numbers, coloured Fastext
+  // buttons, live scores rotating through sub-pages as they come in. Pick a game and the page
+  // shrinks into the corner while the SportsHub Live L-frame opens round it (the app's rail and
+  // strip: stats, events, lineups, table; score and timeline), as the player does on tvOS.
+  const TT = { page: 300, sub: 0, subTimer: null, entry: "" };
+  const ttPad = (t, n) => { t = String(t ?? ""); return t.length > n ? t.slice(0, n) : t + " ".repeat(n - t.length); };
+  const ttPadL = (t, n) => { t = String(t ?? ""); return t.length > n ? t.slice(0, n) : " ".repeat(n - t.length) + t; };
+  const ttTeam = (n) => {
+    let s = String(n || "").replace(/\b(FC|AFC|CF|SC)\b/g, "").replace(/\s+/g, " ").trim();
+    const map = { "Manchester United": "Man Utd", "Manchester City": "Man City", "Tottenham Hotspur": "Tottenham", "Wolverhampton Wanderers": "Wolves",
+      "Brighton & Hove Albion": "Brighton", "Newcastle United": "Newcastle", "West Ham United": "West Ham", "Nottingham Forest": "Nott'm Forest", "Sheffield United": "Sheff Utd" };
+    return map[s] || s;
+  };
+  function ttPages() {
+    const d = live.data || {};
+    const tables = (live.tables || []);
+    const pages = [
+      { n: 300, title: "SPORT", kind: "index" },
+      { n: 301, title: "LIVE SCORES", kind: "live" },
+      { n: 302, title: "LATEST GOALS", kind: "goals" },
+      { n: 303, title: "RESULTS", kind: "results" },
+      { n: 304, title: "FIXTURES", kind: "fixtures" },
+    ];
+    tables.forEach((t, i) => pages.push({ n: 310 + i, title: String(t.league).toUpperCase(), kind: "table", table: t }));
+    return pages;
+  }
+  function ttGo(n) {
+    const pages = ttPages();
+    const p = pages.find((x) => x.n === n);
+    TT.page = p ? n : 300; TT.sub = 0; TT.entry = ""; TT.notFound = p ? null : n;
+    clearInterval(TT.subTimer);
+    TT.subTimer = setInterval(() => { TT.sub++; if (remote.mode === "live" && !busy("tab-remote")) renderRemote(); }, 9000);
+    renderRemote();
+  }
+  // Number keys type a page number, as on a TV remote (when no box has focus).
+  document.addEventListener("keydown", (e) => {
+    if (remote.mode !== "live" || currentTab !== "remote" || /^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || "")) return;
+    if (/^[0-9]$/.test(e.key)) {
+      TT.entry = (TT.entry + e.key).slice(-3);
+      if (TT.entry.length === 3) ttGo(Number(TT.entry)); else renderRemote();
+    } else if (e.key === "Escape" && live.focus) { liveUnfocus(); }
+  });
+  function liveUnfocus() { live.focus = null; live.focusData = null; clearTimeout(live.focusTimer); renderRemote(); }
+
+  // One teletext line: an array of [text, colour, opts] spans, padded to 40 columns.
+  function ttLine(spans, opts = {}) {
+    const row = el("div", { class: "tt-l" + (opts.dh ? " dh" : "") + (opts.bg ? " bg-" + opts.bg : "") + (opts.click ? " link" : "") });
+    let used = 0;
+    for (const [t, c] of spans) { const text = String(t); used += text.length; row.append(el("span", { class: "c-" + (c || "w"), text })); }
+    if (used < 40) row.append(el("span", { text: " ".repeat(40 - used) }));
+    if (opts.click) row.addEventListener("click", opts.click);
+    return row;
+  }
+  function ttBody() {
+    const d = live.data || {};
+    const pages = ttPages();
+    const p = pages.find((x) => x.n === TT.page) || pages[0];
+    const lines = [];
+    const blank = () => lines.push(ttLine([[""]]));
+    const gameLines = (g, withScorers) => {
+      const lead = hubLead(g), trail = hubTrail(g), [a, b] = hubScores(g);
+      const st = g.state === "live" ? hubClock(g).replace("LIVE", "") : g.state === "finished" ? "FT" : timeText(g.kickoff);
+      const click = () => liveFocus(g);
+      const score = g.state === "upcoming" ? " v " : `${a ?? 0}-${b ?? 0}`;
+      lines.push(ttLine([[ttPad(ttTeam(lead.name), 15), "w"], [ttPadL(score, 5), g.state === "live" ? "y" : "w"], [" ", "w"], [ttPad(ttTeam(trail.name), 14), "w"], [ttPadL(st, 5), g.state === "live" ? "g" : "c"]], { click }));
+      if (withScorers) {
+        const hs = (g.awayFirst ? g.awayScorers : g.homeScorers) || [], as = (g.awayFirst ? g.homeScorers : g.awayScorers) || [];
+        const n = Math.max(hs.length, as.length);
+        for (let i = 0; i < Math.min(n, 3); i++) lines.push(ttLine([[" " + ttPad(hs[i] || "", 19), "c"], [" " + ttPad(as[i] || "", 19), "c"]], { click }));
+      }
+    };
+    const byLeague = (list, withScorers, perPage) => {
+      // Sub-pages: a few leagues per page, rotating like the real thing.
+      const groups = [];
+      for (const g of list) { let grp = groups.find((x) => x.lg === g.league); if (!grp) groups.push(grp = { lg: g.league, games: [] }); grp.games.push(g); }
+      const chunks = []; let cur = [], size = 0;
+      for (const grp of groups) {
+        const h = 2 + grp.games.length * (withScorers ? 2 : 1);
+        if (size + h > perPage && cur.length) { chunks.push(cur); cur = []; size = 0; }
+        cur.push(grp); size += h;
+      }
+      if (cur.length) chunks.push(cur);
+      return chunks;
+    };
+    let subs = 1;
+    if (p.kind === "index") {
+      lines.push(ttLine([[" TivEPG SPORT INDEX", "y"]], { dh: true })); blank();
+      for (const x of pages.slice(1)) lines.push(ttLine([[" " + ttPad(x.title, 32), "w"], [String(x.n), "y"]], { click: () => ttGo(x.n) }));
+      blank();
+      const nLive = (d.live || []).length;
+      lines.push(ttLine([[` ${nLive} GAME${nLive === 1 ? "" : "S"} LIVE IN YOUR SPORTS HUB`, nLive ? "g" : "c"]]));
+      lines.push(ttLine([[" Select any game for stats and lineups", "c"]]));
+    } else if (p.kind === "live" || p.kind === "results" || p.kind === "fixtures") {
+      const list = p.kind === "live" ? (d.live || []) : p.kind === "results" ? (d.results || []) : (d.today || []);
+      const head = p.kind === "live" ? " LIVE SCORES" : p.kind === "results" ? " RESULTS TODAY" : " LATER TODAY";
+      lines.push(ttLine([[head, p.kind === "live" ? "g" : "y"]], { dh: true }));
+      if (!list.length) { blank(); lines.push(ttLine([[p.kind === "live" ? " No games in progress" : p.kind === "results" ? " No results yet today" : " Nothing else on today", "c"]])); }
+      else {
+        const chunks = byLeague(list, p.kind !== "fixtures", 16);
+        subs = chunks.length;
+        const chunk = chunks[TT.sub % chunks.length];
+        for (const grp of chunk) {
+          blank();
+          lines.push(ttLine([[" " + String(grp.lg).toUpperCase(), "c"]], { bg: "b" }));
+          grp.games.forEach((g) => gameLines(g, p.kind !== "fixtures"));
+        }
+      }
+    } else if (p.kind === "goals") {
+      lines.push(ttLine([[" LATEST GOALS", "y"]], { dh: true })); blank();
+      const gl = (d.goals || []).filter((g) => g.kind === "goal" || g.kind === "red");
+      if (!gl.length) lines.push(ttLine([[" No goals yet", "c"]]));
+      const per = 9; subs = Math.max(1, Math.ceil(gl.length / per));
+      gl.slice((TT.sub % subs) * per, (TT.sub % subs) * per + per).forEach((g, i) => {
+        const game = (d.live || []).concat(d.results || []).find((x) => [x.home, x.away].some((t) => ttTeam(t) === ttTeam(g.leading)));
+        const click = game ? () => liveFocus(game) : null;
+        lines.push(ttLine([[ttPad(ttTeam(g.leading), 15), "w"], [ttPadL((g.score || "v").replace("–", "-"), 5), "y"], [" " + ttPad(ttTeam(g.trailing), 14), "w"],
+          [ttPadL(i === 0 && TT.sub % subs === 0 && Date.now() / 1000 - g.at < 600 ? "NEW" : g.competition, 5), i === 0 ? "m" : "c"]], { click }));
+        lines.push(ttLine([[" " + (g.kind === "red" ? "SENT OFF " : "") + String(g.scorer || "").toUpperCase() + " " + (g.minute || ""), g.kind === "red" ? "r" : "c"]], { click }));
+      });
+    } else if (p.kind === "table") {
+      const t = p.table;
+      lines.push(ttLine([[" " + ttPad(String(t.league).toUpperCase(), 30), "y"], [t.live ? " LIVE" : "", "g"]], { dh: true })); blank();
+      lines.push(ttLine([["    ", "w"], [ttPad("", 22), "w"], ["  P", "c"], ["   GD", "c"], ["  PTS", "c"]], { bg: "b" }));
+      const per = 18; subs = Math.max(1, Math.ceil(t.rows.length / per));
+      const playing = new Set((d.live || []).flatMap((g) => [ttTeam(g.home), ttTeam(g.away)]));
+      t.rows.slice((TT.sub % subs) * per, (TT.sub % subs) * per + per).forEach((r) => {
+        const on = playing.has(ttTeam(r.team));
+        lines.push(ttLine([[ttPadL(r.rank, 3) + " ", "w"], [ttPad(ttTeam(r.team), 22), on ? "g" : "w"], [ttPadL(r.played, 3), "w"],
+          [ttPadL((r.gd > 0 ? "+" : "") + Math.round(r.gd || 0), 5), "w"], [ttPadL(r.points, 5), "y"]]));
+      });
+      if (playing.size) { blank(); lines.push(ttLine([[" Green: playing now", "g"]])); }
+    }
+    return { lines, subs, title: p.title };
+  }
+
+  function renderTeletext() {
+    const box = el("div", { class: "tt" });
+    const now = new Date();
+    const { lines, subs } = ttBody();
+    const head = TT.entry ? `P${ttPad(TT.entry, 3).replace(/ /g, "-")}` : `P${TT.page}`;
+    const stamp = now.toLocaleDateString("en-GB", { weekday: "short", day: "2-digit", month: "short" }).replace(",", "") + " " + now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    const screen = el("div", { class: "tt-screen" });
+    screen.append(ttLine([[head + " ", "w"], ["TivEPG", "y"], [" ", "w"], [ttPadL(stamp, 40 - head.length - 8), "w"]]));
+    screen.append(ttLine([[" TivEPG SPORT ", "w"], [subs > 1 ? ttPadL(`${(TT.sub % subs) + 1}/${subs}`, 25) : "", "w"]], { bg: "bl" }));
+    // A goal comes in: a flashing line under the header (teletext had no alerts; this is ours).
+    if (live.flash && !live.focus) {
+      const g = live.flash;
+      lines.unshift(ttLine([[" GOAL ", "k"], [" " + ttPad(`${ttTeam(g.leading)} ${(g.score || "").replace("–", "-")} ${ttTeam(g.trailing)} ${String(g.scorer || "").split(" ").pop()} ${g.minute || ""}`, 33), "y"]], { bg: "r" }));
+      lines[0].classList.add("tt-flash");
+    }
+    lines.forEach((l) => screen.append(l));
+    for (let i = lines.length; i < 21; i++) screen.append(ttLine([[""]]));
+    // Fastext: red, green, yellow, cyan.
+    const fast = [["Live", 301, "r"], ["Goals", 302, "g"], ["Tables", ttPages().find((x) => x.kind === "table") ? 310 : 303, "y"], ["Index", 300, "c"]];
+    const row = el("div", { class: "tt-l tt-fast" });
+    fast.forEach(([t, n, c]) => { const b = el("button", { class: "c-" + c, type: "button", text: ttPad(t, 10) }); b.addEventListener("click", () => ttGo(n)); row.append(b); });
+    screen.append(row);
+    if (TT.notFound) setTimeout(() => { TT.notFound = null; }, 0);
+    box.append(screen);
+    // Page entry (phones have no number keys here).
+    const pad = el("div", { class: "tt-pad" });
+    const input = el("input", { class: "tt-input", inputmode: "numeric", maxlength: "3", placeholder: "Page", "aria-label": "Go to page", value: "" });
+    input.addEventListener("input", () => { const v = input.value.replace(/\D/g, "").slice(0, 3); input.value = v; if (v.length === 3) { input.blur(); ttGo(Number(v)); } });
+    pad.append(input, ...ttPages().map((x) => { const b = el("button", { class: "tt-chip" + (x.n === TT.page ? " on" : ""), type: "button", text: `${x.n} ${x.title.slice(0, 14)}` }); b.addEventListener("click", () => ttGo(x.n)); return b; }));
+    box.append(pad);
+    return box;
+  }
+
   function renderLive(panel) {
     const d = live.data;
-    const frame = el("div", { class: "shl" });
-    panel.append(frame);
-    if (!d) { frame.append(el("div", { class: "shl-empty" }, el("p", { text: "Loading SportsHub Live…" }))); return; }
-    if (d.error) { frame.append(el("div", { class: "shl-empty" }, el("p", { text: d.error }))); return; }
-    const games = d.live || [];
-    const np = nowPlaying();
+    if (!TT.subTimer) ttGo(TT.page);
+    const wrap = el("div", { class: "shl" + (live.focus ? " focused" : " text-only") });
+    panel.append(wrap);
+    if (!d) { wrap.append(el("div", { class: "shl-empty" }, el("p", { text: "Tuning in…" }))); return; }
+    if (d.error) { wrap.append(el("div", { class: "shl-empty" }, el("p", { text: d.error }))); return; }
+    const centre = el("div", { class: "shl-centre" }, renderTeletext());
+    wrap.append(centre);
+    if (!live.focus) return;
 
-    // ---- Centre: every live game, by league, with filters ----
-    const centre = el("div", { class: "shl-centre" });
-    const leagues = ["All", ...new Set(games.map((g) => g.league))];
-    if (!leagues.includes(live.filter)) live.filter = "All";
-    const fs = el("button", { class: "shl-fs", type: "button", title: "Full screen", text: "⛶ Full screen" });
-    fs.addEventListener("click", () => {
-      if (document.fullscreenElement) document.exitFullscreen();
-      else (document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen || (() => {})).call(document.documentElement);
-    });
-    centre.append(el("div", { class: "shl-hdr" },
-      el("span", { text: `SPORTSHUB LIVE · ${games.length ? games.length + " LIVE IN YOUR HUB" : "NOTHING LIVE RIGHT NOW"}` }),
-      el("span", { class: "shl-hint", text: games.length ? "Tap a game for its stats" : "" }), fs));
-    if (leagues.length > 2) {
-      const chips = el("div", { class: "shl-filters" });
-      for (const l of leagues) {
-        const b = el("button", { class: live.filter === l ? "on" : "", type: "button", text: l });
-        b.addEventListener("click", () => { live.filter = l; renderRemote(); });
-        chips.append(b);
-      }
-      centre.append(chips);
-    }
-    const grid = el("div", { class: "shl-grid" });
-    const shown = games.filter((g) => live.filter === "All" || g.league === live.filter);
-    let lg = "";
-    const tile = (g, kind) => {
-      const lead = hubLead(g), trail = hubTrail(g);
-      const [a, b] = hubScores(g);
-      const t = el("button", { class: "shl-g" + (live.focus && live.focus.id === g.id ? " sel" : "") + (np.fixtureID && String(np.fixtureID) === String(g.id) ? " ontv" : "")
-        + (live.flash && live.flash.leading && (live.flash.leading === lead.name || live.flash.trailing === lead.name) ? " hot" : ""), type: "button" });
-      t.style.setProperty("--c1", liveColor(g.awayFirst ? g.awayColor : g.homeColor, "#3a5bd0"));
-      t.style.setProperty("--c2", liveColor(g.awayFirst ? g.homeColor : g.awayColor, "#8a93a6"));
-      t.append(el("div", { class: "shl-t1" }, el("span", { text: g.league }),
-        el("span", { class: kind === "live" ? "mn" : "", text: kind === "live" ? hubClock(g) : kind === "done" ? hubDone(g) : timeText(g.kickoff) })));
-      if (g.tournament) t.append(el("div", { class: "shl-rw" }, el("span", { text: g.home || g.league })));
-      else t.append(el("div", {},
-        el("div", { class: "shl-rw" }, hubCrest(lead.logo, lead.name, "xs"), el("span", { class: "nm", text: lead.name }), el("b", { text: kind === "upcoming" ? "" : a ?? "" })),
-        el("div", { class: "shl-rw" }, hubCrest(trail.logo, trail.name, "xs"), el("span", { class: "nm", text: trail.name }), el("b", { text: kind === "upcoming" ? "" : b ?? "" }))));
-      t.append(el("div", { class: "shl-last", text: np.fixtureID && String(np.fixtureID) === String(g.id) ? "● On their TV" : g.last || g.round || "" }));
-      t.addEventListener("click", () => liveFocus(g));
-      return t;
-    };
-    for (const g of shown) {
-      if (g.league !== lg) { lg = g.league; grid.append(el("div", { class: "shl-lg" }, hubCrest(g.leagueLogo, g.league, "xs"), el("span", { text: g.league }))); }
-      grid.append(tile(g, "live"));
-    }
-    if (!games.length) {
-      // Nothing live: today's results and what's still to come keep the screen useful.
-      const today = d.today || [], done = d.results || [];
-      if (today.length) { grid.append(el("div", { class: "shl-lg" }, el("span", { text: "LATER TODAY" }))); today.slice(0, 18).forEach((g) => grid.append(tile(g, "upcoming"))); }
-      if (done.length) { grid.append(el("div", { class: "shl-lg" }, el("span", { text: "RESULTS" }))); done.slice(0, 18).forEach((g) => grid.append(tile(g, "done"))); }
-      if (!today.length && !done.length) grid.append(el("p", { class: "shl-none", text: "Nothing live or coming up today in their hub." }));
-    }
-    centre.append(grid);
-
-    // ---- Rail ----
-    const rail = el("aside", { class: "shl-rail" });
-    rail.append(el("div", { class: "shl-ident" }, el("span", { class: "shl-mark", text: "T" }),
-      el("span", { class: "shl-word" }, "SportsHub ", el("em", { text: "Live" })), el("span", { class: "shl-livetag", text: "LIVE" }),
-      el("span", { class: "shl-clk", text: new Date().toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) })));
+    // ---- The L: rail (stats, events, lineups, table) + strip (score, timeline, scores band) ----
     const f = live.focus;
-    const tabs = f ? ["Stats", "Events", "Table"] : ["Scores", "Tables", "Latest"];
-    if (!tabs.includes(live.tab)) live.tab = tabs[0];
+    const md = live.focusData;
+    const lead = hubLead(f), trail = hubTrail(f), [a, b] = hubScores(f);
+    const rail = el("aside", { class: "shl-rail" });
+    const close = el("button", { class: "shl-x", type: "button", "aria-label": "Close", text: "✕" });
+    close.addEventListener("click", liveUnfocus);
+    rail.append(el("div", { class: "shl-ident" }, el("span", { class: "shl-mark", text: "T" }),
+      el("span", { class: "shl-word" }, "SportsHub ", el("em", { text: "Live" })), f.state === "live" ? el("span", { class: "shl-livetag", text: "LIVE" }) : null,
+      el("span", { class: "shl-clk", text: new Date().toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) }), close));
+    const hasLineups = md && md.lineups && ((md.lineups.home || []).length || (md.lineups.away || []).length);
+    const tabs = ["Stats", "Events"].concat(hasLineups ? ["Lineups"] : [], ["Table"]);
+    if (!tabs.includes(live.tab)) live.tab = "Stats";
     rail.append(el("div", { class: "shl-tabs" }, tabs.map((t) => {
-      const b = el("button", { class: "shl-tab" + (live.tab === t ? " on" : ""), type: "button", text: t });
-      b.addEventListener("click", () => { live.tab = t; renderRemote(); });
-      return b;
+      const btn = el("button", { class: "shl-tab" + (live.tab === t ? " on" : ""), type: "button", text: t });
+      btn.addEventListener("click", () => { live.tab = t; renderRemote(); });
+      return btn;
     })));
     const body = el("div", { class: "shl-rbody" });
     rail.append(body);
-    const goalRow = (g) => el("div", { class: "shl-ev" },
-      el("span", { class: "m", text: g.minute || "" }),
-      el("span", { class: "k " + (g.kind || "goal"), text: g.kind === "red" ? "" : g.kind === "goal" ? "⚽" : "•" }),
-      el("div", {}, el("div", { text: g.scorer || "Goal" }), el("div", { class: "s", text: `${g.leading} ${g.score || "v"} ${g.trailing} · ${g.competition}` })));
-    if (f) {
-      const back = el("button", { class: "shl-back", type: "button", text: "‹ All live games" });
-      back.addEventListener("click", () => { live.focus = null; live.focusData = null; clearTimeout(live.focusTimer); live.tab = "Scores"; renderRemote(); });
-      const lead = hubLead(f), trail = hubTrail(f), [a, b] = hubScores(f);
-      body.append(back, el("div", { class: "shl-gh" },
-        el("span", { class: "mn", text: `${f.league} · ${f.state === "live" ? hubClock(f) : f.state === "finished" ? hubDone(f) : timeText(f.kickoff)}` }),
-        el("span", { class: "nm", text: lead.name }), el("span", { class: "sc", text: f.state === "upcoming" ? "v" : `${a ?? ""}–${b ?? ""}` }), el("span", { class: "nm", text: trail.name })));
-      const md = live.focusData;
-      if (!md) body.append(el("p", { class: "shl-s", text: "Loading…" }));
-      else if (live.tab === "Stats") mcStats(body, md);
-      else if (live.tab === "Events") mcSummary(body, md);
+    if (!md) body.append(el("p", { class: "shl-s", text: "Loading…" }));
+    else if (live.tab === "Stats") mcStats(body, md);
+    else if (live.tab === "Events") mcSummary(body, md);
+    else if (live.tab === "Lineups") mcLineups(body, md);
+    else {
+      const t = (live.tables || []).find((x) => x.league === f.league);
+      if (!t) body.append(el("p", { class: "shl-s", text: "No table for this one." }));
       else {
-        const t = (live.tables || []).find((x) => x.league === f.league);
-        body.append(t ? liveTableEl(t, [lead.name, trail.name]) : el("p", { class: "shl-s", text: "No table for this one." }));
+        const box = el("div", { class: "shl-tbl" }), tb = el("table", {});
+        t.rows.forEach((r) => tb.append(el("tr", { class: [ttTeam(lead.name), ttTeam(trail.name)].includes(ttTeam(r.team)) ? "me" : "" },
+          el("td", { class: "rk", text: String(r.rank) }), el("td", {}, hubCrest(r.logo, r.team, "xs"), " ", r.team),
+          el("td", { class: "n", text: String(r.played) }), el("td", { class: "p", text: String(r.points) }))));
+        box.append(tb); body.append(box);
       }
-      const watch = el("button", { class: "shl-watch", type: "button", text: "▶ Watch on TV" });
-      watch.addEventListener("click", () => { remote.mode = "sports"; liveStop(); openSportsEvent(f, "UPCOMING"); });
-      body.append(watch);
-    } else if (live.tab === "Scores") {
-      body.append(el("div", { class: "shl-sec", text: `ALL LIVE · ${games.length}` }));
-      if (!games.length) body.append(el("p", { class: "shl-s", text: "Nothing live right now." }));
-      for (const g of games) {
-        const lead = hubLead(g), trail = hubTrail(g), [a, b] = hubScores(g);
-        const r = el("button", { class: "shl-ev shl-score", type: "button" },
-          el("div", {}, el("div", {}, `${lead.name} `, el("b", { text: `${a ?? ""}–${b ?? ""}` }), ` ${trail.name}`), el("div", { class: "s", text: g.league })),
-          el("span", { class: "m live", text: hubClock(g) }));
-        r.addEventListener("click", () => liveFocus(g));
-        body.append(r);
-      }
-      if ((d.results || []).length) {
-        body.append(el("div", { class: "shl-sec", text: "RESULTS TODAY" }));
-        for (const g of d.results.slice(0, 20)) {
-          const lead = hubLead(g), trail = hubTrail(g), [a, b] = hubScores(g);
-          const r = el("button", { class: "shl-ev shl-score", type: "button" },
-            el("div", {}, el("div", {}, `${lead.name} `, el("b", { text: `${a ?? ""}–${b ?? ""}` }), ` ${trail.name}`), el("div", { class: "s", text: g.league })),
-            el("span", { class: "m", text: hubDone(g) }));
-          r.addEventListener("click", () => liveFocus(g));
-          body.append(r);
-        }
-      }
-    } else if (live.tab === "Tables") {
-      if (!live.tables.length) body.append(el("p", { class: "shl-s", text: "Tables load with the next update…" }));
-      for (const t of live.tables) body.append(liveTableEl(t, []));
-    } else {
-      body.append(el("div", { class: "shl-sec", text: "LATEST GOALS" }));
-      const gl = d.goals || [];
-      if (!gl.length) body.append(el("p", { class: "shl-s", text: "No goals yet." }));
-      gl.slice(0, 30).forEach((g) => body.append(goalRow(g)));
     }
+    const watch = el("button", { class: "shl-watch", type: "button", text: "▶ Watch on TV" });
+    watch.addEventListener("click", () => { liveStop(); remote.mode = "sports"; openSportsEvent(f, "UPCOMING"); });
+    if (f.state !== "finished") body.append(watch);
+    wrap.append(rail);
 
-    // ---- Strip: SportsHub Live block + the LATEST GOALS board, the scores band ----
     const strip = el("div", { class: "shl-strip" });
-    const goalsTotal = games.reduce((n, g) => n + (Number(g.homeScore) || 0) + (Number(g.awayScore) || 0), 0);
-    const nLeagues = new Set(games.map((g) => g.league)).size;
-    const board = el("div", { class: "shl-board" },
-      el("div", { class: "bh" }, el("span", { text: "P302" }), el("span", { text: "LATEST GOALS" }),
-        el("span", { text: new Date().toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) })));
-    const gl = (d.goals || []).filter((g) => g.kind === "goal").slice(0, 5);
-    if (!gl.length) board.append(el("div", { class: "br" }, el("span", { text: "No goals yet" })));
-    gl.forEach((g, i) => board.append(el("div", { class: "br" },
-      el("span", { class: "t", text: g.leading }), el("span", { class: "s", text: (g.score || "v").replace("–", "-") }), el("span", { class: "t", text: g.trailing }),
-      el("span", { class: "w", text: `${g.scorer} ${g.minute}` }), el("span", { class: "nw", text: i === 0 && Date.now() / 1000 - g.at < 600 ? "NEW" : "" }))));
-    strip.append(el("div", { class: "shl-stop" },
-      el("div", { class: "shl-hub" }, el("div", { class: "t" }, "SportsHub ", el("em", { text: "Live" })),
-        el("div", { class: "n" }, el("span", {}, el("b", { text: String(games.length) }), "live"), el("span", {}, el("b", { text: String(goalsTotal) }), "goals"), el("span", {}, el("b", { text: String(nLeagues) }), "leagues"))),
-      board));
+    const minute = f.state === "live" ? hubClock(f) : f.state === "finished" ? hubDone(f) : timeText(f.kickoff);
+    const sb = el("div", { class: "shl-score" },
+      el("div", { class: "meta" }, el("span", { class: "mn" + (f.state === "live" ? " live" : ""), text: minute }), el("span", { text: String(f.league).toUpperCase() })),
+      el("div", { class: "row" }, el("span", { class: "kit" }), hubCrest(lead.logo, lead.name, "xs"), el("span", { class: "nm", text: lead.name }), el("span", { class: "sc", text: f.state === "upcoming" ? "" : String(a ?? 0) })),
+      el("div", { class: "row" }, el("span", { class: "kit a" }), hubCrest(trail.logo, trail.name, "xs"), el("span", { class: "nm", text: trail.name }), el("span", { class: "sc", text: f.state === "upcoming" ? "" : String(b ?? 0) })));
+    sb.querySelector(".kit").style.background = liveColor(f.awayFirst ? f.awayColor : f.homeColor, "#3a5bd0");
+    sb.querySelector(".kit.a").style.background = liveColor(f.awayFirst ? f.homeColor : f.awayColor, "#8a93a6");
+    // Timeline: goals above (leading side) / below, the now line.
+    const tl = el("div", { class: "shl-tl" }, el("div", { class: "axis" }), el("div", { class: "ht" }));
+    const mins = (s) => { const m = String(s || "").match(/(\d+)(?:\+(\d+))?/); return m ? Number(m[1]) + (m[2] ? Number(m[2]) / 10 : 0) : null; };
+    const evs = md ? (md.timeline && md.timeline.length ? md.timeline : md.events || []) : [];
+    const leadId = f.awayFirst ? md && md.away && md.away.id : md && md.home && md.home.id;
+    for (const e of evs) {
+      const k = evKind(e), m = mins(e.time || e.clock);
+      if (m == null || !["goal", "pen", "og", "red", "yellow"].includes(k)) continue;
+      const top = e.teamId ? String(e.teamId) === String(leadId) : true;
+      const mk = el("div", { class: "mk " + (top ? "t" : "b") + " " + k }, ["goal", "pen", "og"].includes(k) ? el("span", { class: "ball", text: "⚽" }) : el("span", { class: "cd" }),
+        ["goal", "pen", "og"].includes(k) ? el("span", { class: "lbl", text: `${shortName(e.player || "")} ${m}'` }) : null);
+      mk.style.left = Math.min(100, m / 90 * 100) + "%";
+      tl.append(mk);
+    }
+    const nowMin = f.state === "live" ? mins(hubClock(f)) : f.state === "finished" ? 90 : 0;
+    if (nowMin) { const nl = el("div", { class: "now" }); nl.style.left = Math.min(100, nowMin / 90 * 100) + "%"; tl.append(nl); }
+    tl.append(el("div", { class: "lbls" }, el("span", { text: "KO" }), el("span", { text: "HT" }), el("span", { text: "FT" })));
+    strip.append(el("div", { class: "shl-stop" }, sb, tl));
+    const games = (d.live || []);
     const band = el("div", { class: "shl-band" }, el("div", { class: "bl", text: "● SCORES" }));
-    const chips = () => [...games, ...(d.results || []).slice(0, 12)].map((g) => {
-      const lead = hubLead(g), trail = hubTrail(g), [a, b] = hubScores(g);
-      return el("span", { class: "shl-chip" }, el("span", { class: "lg", text: liveShortLeague(g.league) }),
-        el("span", { class: "bar" }), `${shortTeam(lead.name)} `, el("b", { text: `${a ?? ""}–${b ?? ""}` }), ` ${shortTeam(trail.name)}`,
-        el("span", { class: g.state === "live" ? "mn" : "ft", text: g.state === "live" ? hubClock(g) : hubDone(g) }));
+    const chips = () => games.map((g) => {
+      const l = hubLead(g), t = hubTrail(g), [x, y] = hubScores(g);
+      const c = el("button", { class: "shl-chip", type: "button" }, el("span", { class: "lg", text: liveShortLeague(g.league) }), `${ttTeam(l.name)} `, el("b", { text: `${x ?? 0}–${y ?? 0}` }), ` ${ttTeam(t.name)}`, el("span", { class: "mn", text: hubClock(g) }));
+      c.addEventListener("click", () => liveFocus(g));
+      return c;
     });
-    const lane = el("div", { class: "shl-lane" }, el("div", { class: "run" }, chips()), el("div", { class: "run", "aria-hidden": "true" }, chips()));
-    lane.style.setProperty("--dur", Math.max(30, (games.length + Math.min(12, (d.results || []).length)) * 6) + "s");
-    band.append(el("div", { class: "shl-belt" }, lane));
+    if (games.length) {
+      const lane = el("div", { class: "shl-lane" }, el("div", { class: "run" }, chips()), el("div", { class: "run", "aria-hidden": "true" }, chips()));
+      lane.style.setProperty("--dur", Math.max(30, games.length * 7) + "s");
+      band.append(el("div", { class: "shl-belt" }, lane));
+    }
     strip.append(band);
     if (live.flash) {
       const g = live.flash;
       strip.append(el("div", { class: "shl-flash" }, el("div", { class: "big", text: "GOAL" }),
         el("div", { class: "who" }, `${g.scorer} ${g.minute}`, el("small", { text: `${g.leading} ${g.score || ""} ${g.trailing} · ${g.competition}` }))));
     }
-
-    frame.append(centre, rail, strip);
-  }
-  function liveTableEl(t, mine) {
-    const box = el("div", { class: "shl-tbl" }, el("div", { class: "shl-sec", text: `${t.league}${t.live ? " · LIVE TABLE" : ""}`.toUpperCase() }));
-    const tb = el("table", {});
-    for (const r of t.rows) {
-      tb.append(el("tr", { class: mine.includes(r.team) ? "me" : "" },
-        el("td", { class: "rk", text: String(r.rank) }), el("td", {}, hubCrest(r.logo, r.team, "xs"), " ", r.team),
-        el("td", { class: "n", text: String(r.played) }), el("td", { class: "p", text: String(r.points) })));
-    }
-    box.append(tb);
-    return box;
+    wrap.append(strip);
   }
 
   // ---------- The playing controls: a remote for whatever is on ----------
