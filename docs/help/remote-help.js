@@ -1475,7 +1475,8 @@
     mode: "guide",
     guide: { groups: null, open: new Set(["pinned"]), category: null, channels: null, filter: "",
              search: null, searchFor: "", searchTimer: null },
-    sports: { group: null, item: null, events: null, event: null, channels: null },
+    sports: { dest: null, events: null, view: "fixtures", filter: "All", table: null, tableTried: false, ticker: null,
+              event: null, eventCode: null, channels: null, picker: false, pickSport: null, pickQuery: "" },
     // Movies and Series: categories in their tab's order, then titles, then (series) episodes.
     vod: { cats: null, cat: null, titles: null, more: false, query: "", searching: false, filter: "" },
     series: { cats: null, cat: null, titles: null, more: false, query: "", searching: false, filter: "", show: null, episodes: null, season: null },
@@ -1500,7 +1501,7 @@
       if (remote.guide.category) openGuideCategory(remote.guide.category, false);
       else loadGuideGroups();
     } else if (mode === "sports") {
-      if (remote.sports.item) openSportsItem(remote.sports.item);
+      hubOpen(remote.sports.dest || UPCOMING_DEST);
     } else if (mode === "vod" || mode === "series") {
       if (!remote[mode].cats) loadVodCategories(mode);
     }
@@ -1526,31 +1527,6 @@
     };
     await load();
     remoteRefreshEvery(60000, load);
-  }
-
-  async function openSportsItem(item) {
-    remote.sports.item = item;
-    remote.sports.event = null;
-    remote.sports.channels = null;
-    if (!remote.sports.events || remote.sports.events.code !== item.code + "|" + (item.competition || "")) remote.sports.events = null;
-    renderRemote();
-    const load = async () => {
-      const r = await command("hubEvents", { code: item.code, competition: item.competition });
-      if (remote.sports.item === item) {
-        remote.sports.events = { code: item.code + "|" + (item.competition || ""), list: r.ok ? r.events : [] };
-        if (!busy("tab-remote")) renderRemote();
-      }
-    };
-    await load();
-    remoteRefreshEvery(45000, load);
-  }
-
-  async function openSportsEvent(ev) {
-    remote.sports.event = ev;
-    remote.sports.channels = null;
-    renderRemote();
-    const r = await command("hubEventChannels", { code: remote.sports.item.code, fixture: ev.id });
-    if (remote.sports.event === ev) { remote.sports.channels = r.ok ? r.channels : []; renderRemote(); }
   }
 
   function busy(id) {
@@ -2721,99 +2697,517 @@
     panel.append(list);
   }
 
-  const UPCOMING = { id: "__upcoming", name: "Upcoming", items: [] };
-  const UPCOMING_ITEM = { code: "UPCOMING", name: "Upcoming" };
+  // ---------- Sports Hub: the app's own hub ----------
+  // Drawn the way their app draws it: on a computer the Apple TV layout (ticker, competition
+  // header, Fixtures / Results shelf, wide match cards with the league crest bay, the table
+  // beside the list); on a phone the iPhone layout (status rail cards, a Table tab, the
+  // competition picker as a sheet). Browsing never changes their screen; only Watch does.
+  const hubMQ = window.matchMedia("(min-width: 900px)");
+  const hubIsTV = () => hubMQ.matches;
+  hubMQ.addEventListener("change", () => {
+    if (currentTab === "remote" && remote.mode === "sports" && !mc.open && !busy("tab-remote")) renderRemote();
+  });
+  const UPCOMING_DEST = { code: "UPCOMING", name: "Upcoming", place: true };
+  const hubKey = (d) => d.code + "|" + (d.competition || "");
+  const hubSetting = (id, fallback) => {
+    const s = (snapshot.settings || []).find((x) => x.id === id);
+    return s && s.value !== undefined ? s.value : fallback;
+  };
 
+  // The app's eight hub themes (SportsHubTheme specs): ground top/mid/foot, card, panel,
+  // chrome, hairline + alpha, accent, then the text ramp. They follow the theme picked on
+  // their device; League Colours wears Default here (the page has no league palette).
+  const HUB_THEMES = {
+    graphite: ["#131922", "#0E1219", "#080B11", "#1E2530", "#101216", "#08090C", "255,255,255", 0.10, "#6E86A8", "#ECEAE7", "#B8BDC7", "#8B909C", "#666B77"],
+    midnight: ["#161C2B", "#101523", "#090C15", "#222B40", "#111726", "#070A12", "175,198,255", 0.12, "#5B8FE0", "#E8EBF2", "#B2BCD0", "#848EA4", "#606A80"],
+    blackout: ["#0A0A0B", "#060607", "#030304", "#16171A", "#0A0A0C", "#000000", "255,255,255", 0.08, "#7C8490", "#E4E2DF", "#AAAEB6", "#7E828B", "#5A5E67"],
+    onyxAmber: ["#1B1815", "#141210", "#0C0B09", "#28231D", "#151210", "#0A0908", "255,223,176", 0.11, "#C08A45", "#EFE9E0", "#C2B8A9", "#948B7E", "#6B645B"],
+    deepTeal: ["#11242A", "#0B1A1F", "#060F13", "#1B333B", "#0C1C21", "#050C0F", "168,232,242", 0.12, "#3FA8B8", "#E4EDEF", "#AAC0C6", "#7D9299", "#5A6D73"],
+    forest: ["#122016", "#0D1710", "#070D09", "#1D2F23", "#0D1810", "#060B07", "182,239,196", 0.11, "#4E9A63", "#E7EBE5", "#AEBCAF", "#808E82", "#5D6A5F"],
+    aubergine: ["#1D1726", "#15101C", "#0C0912", "#2B2338", "#150F1D", "#0A0710", "227,198,234", 0.11, "#A173B0", "#EBE6EF", "#B9AFC3", "#8B8296", "#665F70"],
+    slate: ["#272A31", "#1D2026", "#14161A", "#3A3F49", "#212429", "#101216", "255,255,255", 0.14, "#8AA2C4", "#F2F1EE", "#C8CCD4", "#9BA0AB", "#767B86"],
+  };
+  // Set through the CSSOM: the page's CSP (style-src 'self') refuses style="" attributes.
+  function applyHubTheme(node) {
+    const t = HUB_THEMES[hubSetting("sportsHubTheme", "graphite")] || HUB_THEMES.graphite;
+    const vars = { g1: t[0], g2: t[1], g3: t[2], card: t[3], panel: t[4], chrome: t[5],
+      line: `rgba(${t[6]},${t[7]})`, "line-2": `rgba(${t[6]},${(t[7] * 1.6).toFixed(2)})`, wash: t[6],
+      accent: t[8], t1: t[9], t2: t[10], t3: t[11], t4: t[12] };
+    for (const [k, v] of Object.entries(vars)) node.style.setProperty("--h-" + k, v);
+    return node;
+  }
+
+  // Every competition shown in their hub, by sport (the picker's columns), as the switcher.
+  function hubSports() {
+    const out = [];
+    for (const g of (snapshot.sports || {}).groups || []) {
+      const items = [];
+      for (const it of g.items || []) {
+        if (it.shown === false && !(it.competitions || []).some((c) => c.shown !== false)) continue;
+        if (it.competitions) {
+          items.push({ code: it.code, name: it.name, logo: it.logo, sport: g.name, all: true });
+          for (const c of it.competitions) if (c.shown !== false) items.push({ code: c.code, competition: c.name, name: c.name, logo: c.logo, sport: g.name });
+        } else {
+          items.push({ code: it.code, competition: it.kind === "competition" ? it.name : undefined, name: it.name, logo: it.logo, sport: g.name });
+        }
+      }
+      // A sport's All page is named for the sport ("All Football"), as in the app.
+      const alls = items.filter((i) => i.all);
+      for (const i of alls) i.label = alls.length === 1 ? `All ${g.name}` : `All ${i.name}`;
+      if (items.length) out.push({ id: g.id, name: g.name, items });
+    }
+    return out;
+  }
+
+  function hubEnsure() {
+    const sp = remote.sports;
+    if (!sp.dest) hubOpen(UPCOMING_DEST);
+  }
+
+  async function hubOpen(dest) {
+    const sp = remote.sports;
+    const changed = !sp.dest || hubKey(sp.dest) !== hubKey(dest);
+    sp.dest = dest;
+    sp.event = null;
+    sp.channels = null;
+    sp.picker = false;
+    if (changed) {
+      sp.events = null; sp.table = null; sp.tableTried = false; sp.filter = "All";
+      if (dest.code === "UPCOMING" || sp.view === "table") sp.view = "fixtures";
+    }
+    renderRemote();
+    let round = 0;
+    const load = async () => {
+      const key = hubKey(dest);
+      const wantsTicker = hubSetting("sportsHubShowLiveTicker", true) !== false && dest.code !== "UPCOMING";
+      // The table every fifth round (~4 min): it moves with the scores, not by the second.
+      const wantsTable = dest.code !== "UPCOMING" && !dest.all && round % 5 === 0;
+      round++;
+      const [ev, tick, table] = await Promise.all([
+        command("hubEvents", { code: dest.code, competition: dest.competition }),
+        wantsTicker ? command("hubEvents", { code: "UPCOMING" }) : null,
+        wantsTable ? command("hubTable", { code: dest.code, competition: dest.competition }) : null,
+      ]);
+      if (!sp.dest || hubKey(sp.dest) !== key) return;
+      sp.events = ev && ev.ok ? ev.events : [];
+      if (dest.code === "UPCOMING") sp.ticker = sp.events;
+      else if (tick && tick.ok) sp.ticker = tick.events;
+      if (table) { sp.tableTried = true; if (table.ok && table.table) sp.table = table.table; }
+      if (!busy("tab-remote") && !sp.picker && !sp.event) renderRemote();
+    };
+    await load();
+    remoteRefreshEvery(45000, load);
+  }
+
+  async function openSportsEvent(ev, code) {
+    const sp = remote.sports;
+    sp.event = ev;
+    sp.eventCode = code || (sp.dest || UPCOMING_DEST).code;
+    sp.channels = null;
+    renderRemote();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    const r = await command("hubEventChannels", { code: sp.eventCode, fixture: ev.id });
+    if (sp.event === ev) { sp.channels = r.ok ? r.channels : []; renderRemote(); }
+  }
+
+  // ----- small pieces -----
+  const hubLead = (ev) => ev.awayFirst
+    ? { name: ev.away, logo: ev.awayLogo, score: ev.awayScore }
+    : { name: ev.home, logo: ev.homeLogo, score: ev.homeScore };
+  const hubTrail = (ev) => ev.awayFirst
+    ? { name: ev.home, logo: ev.homeLogo, score: ev.homeScore }
+    : { name: ev.away, logo: ev.awayLogo, score: ev.awayScore };
+  function hubScores(ev) {
+    // Older apps send only "2–1" (home first).
+    let h = ev.homeScore, a = ev.awayScore;
+    if ((h === undefined || a === undefined) && ev.score) {
+      const m = String(ev.score).match(/(\d+)\D+(\d+)/);
+      if (m) { h = +m[1]; a = +m[2]; }
+    }
+    return ev.awayFirst ? [a, h] : [h, a];
+  }
+  const hubIsAmerican = (ev) => /american football|basketball|baseball|hockey/i.test(ev.sport || "")
+    || /^(NFL|NBA|MLB|NHL|WNBA|NCAAF|NCAAB)$/i.test(ev.league || "");
+  const hubDone = (ev) => (hubIsAmerican(ev) ? "FINAL" : "FT");
+  const hubClock = (ev) => {
+    const l = String(ev.label || ev.status || "").trim();
+    return !l || /^(live|in ?play|inprogress)$/i.test(l) ? "LIVE" : l.replace(/^in progress$/i, "LIVE");
+  };
+  function hubSoon(ev) {
+    const mins = Math.round((ev.kickoff * 1000 - Date.now()) / 60000);
+    if (mins <= 0) return "Starting";
+    if (mins < 60) return `In ${mins} min`;
+    if (mins < 6 * 60) return `In ${Math.floor(mins / 60)}h ${String(mins % 60).padStart(2, "0")}m`;
+    return "";
+  }
+  const hubShortDate = (t) => new Date(t * 1000).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+  const hubCrest = (url, label, cls = "") => {
+    const a = art(url, "logo", label);
+    a.classList.add("hub-crest");
+    if (cls) a.classList.add(...cls.split(" "));
+    return a;
+  };
+  const hubPlaying = (ev) => {
+    const np = nowPlaying();
+    return np.active && np.fixtureID && String(np.fixtureID) === String(ev.id);
+  };
+
+  // ----- the screen -----
   function renderRemoteSports(panel) {
     const sp = remote.sports;
-    const sports = snapshot.sports || {};
-    const groups = sports.groups || [];
+    const groups = (snapshot.sports || {}).groups || [];
     if (!groups.length) { panel.append(el("p", { class: "empty", text: "Their Sports Hub hasn't loaded yet." })); return; }
+    if (!sp.dest) { setTimeout(hubEnsure, 0); sp.dest = UPCOMING_DEST; }
+    const tv = hubIsTV();
+    const hub = applyHubTheme(el("div", { class: "hub " + (tv ? "hub-tv" : "hub-ios") }));
+    panel.append(hub);
 
-    // 1. Sport (Upcoming first, as the hub has it)
-    if (!sp.group) {
-      panel.append(el("p", { class: "hint", text: "Pick a sport, then a competition, then the match. Browsing here doesn't change their screen." }));
-      const list = el("div", { class: "list" });
-      const up = el("button", { class: "item cat-row", type: "button" },
-        el("div", { class: "grow" }, el("div", { class: "title", text: "Upcoming" }),
-          el("div", { class: "sub", text: "Live now and the next 24 hours, every competition" })),
-        el("span", { class: "chev", text: "›" }));
-      up.addEventListener("click", () => { sp.group = UPCOMING.id; openSportsItem(UPCOMING_ITEM); });
-      list.append(up);
-      for (const g of groups) {
-        const row = el("button", { class: "item cat-row", type: "button" },
-          el("div", { class: "grow" }, el("div", { class: "title", text: g.name }), el("div", { class: "sub", text: g.subtitle })),
-          el("span", { class: "chev", text: "›" }));
-        row.addEventListener("click", () => { sp.group = g.id; renderRemote(); });
-        list.append(row);
-      }
-      panel.append(list);
-      return;
-    }
-    const group = sp.group === UPCOMING.id ? UPCOMING : groups.find((g) => g.id === sp.group);
-    if (!group) { sp.group = null; return renderRemote(); }
-    const back = () => { sp.group = null; sp.item = null; sp.events = null; remoteRefreshEvery(0); renderRemote(); };
+    if (sp.event) { hubEventPage(hub, tv); return; }
 
-    // 2. Competition (a tab with several competitions lists them)
-    if (!sp.item) {
-      panel.append(crumb([["Sports", back], [group.name, null]]));
-      const items = [];
-      for (const it of group.items) {
-        if (it.competitions) for (const c of it.competitions) items.push({ code: c.code, competition: c.name, name: c.name });
-        else items.push({ code: it.code, competition: it.kind === "competition" ? it.name : undefined, name: it.name });
+    if (hubSetting("sportsHubShowLiveTicker", true) !== false && sp.ticker && sp.ticker.length) hub.append(hubTicker(sp.ticker));
+    hub.append(hubHeader(tv));
+    const dest = sp.dest;
+    const evs = sp.events;
+    const hasTable = !!(sp.table && hubTableGroups(sp.table).length);
+
+    // The shelf: Upcoming filters by sport; a competition has Fixtures / Results (and on the
+    // phone, Table, which the TV layout keeps beside the list instead).
+    if (dest.code === "UPCOMING") {
+      const sports = [...new Set((evs || []).map(hubSportName).filter(Boolean))];
+      if (sports.length > 1) {
+        const strip = el("div", { class: "hub-shelf hub-chips" });
+        for (const s of ["All", ...sports]) {
+          const b = el("button", { class: "hub-chip" + (sp.filter === s ? " on" : ""), type: "button", text: s });
+          b.addEventListener("click", () => { sp.filter = s; renderRemote(); });
+          strip.append(b);
+        }
+        hub.append(strip);
       }
-      const list = el("div", { class: "list" });
-      for (const it of items) {
-        const row = el("button", { class: "item cat-row", type: "button" }, el("span", { class: "grow title", text: it.name }), el("span", { class: "chev", text: "›" }));
-        row.addEventListener("click", () => openSportsItem(it));
-        list.append(row);
+    } else {
+      const tabs = [["fixtures", hubIsAmerican({ league: dest.code, sport: dest.sport }) ? "Schedule" : "Fixtures"], ["results", "Results"]];
+      if (!tv && hasTable) tabs.push(["table", /basketball|baseball|american|hockey/i.test(dest.sport || "") ? "Standings" : "Table"]);
+      const shelf = el("div", { class: "hub-shelf hub-tabs", role: "tablist" });
+      for (const [id, title] of tabs) {
+        const b = el("button", { class: "hub-tab" + (sp.view === id ? " on" : ""), type: "button", role: "tab", "aria-selected": sp.view === id ? "true" : "false", text: title });
+        b.addEventListener("click", () => { sp.view = id; renderRemote(); });
+        shelf.append(b);
       }
-      panel.append(list);
-      return;
+      hub.append(shelf);
     }
 
-    // 3. Events
-    if (!sp.event) {
-      panel.append(crumb(group === UPCOMING ? [["Sports", back], ["Upcoming", null]]
-        : [["Sports", back], [group.name, () => { sp.item = null; sp.events = null; remoteRefreshEvery(0); renderRemote(); }], [sp.item.name, null]]));
-      if (!sp.events) { panel.append(el("p", { class: "empty", text: "Loading matches…" })); return; }
-      const evs = sp.events.list;
-      if (!evs.length) { panel.append(el("p", { class: "empty", text: group === UPCOMING ? "Nothing live or coming up in the next 24 hours." : "No matches in the next week." })); return; }
-      let lastHead = "";
-      const list = el("div", { class: "list" });
-      for (const ev of evs) {
-        const head = ev.state === "live" ? "Live now" : ev.group || (ev.state === "finished" ? "Results" : dayText(ev.kickoff));
-        if (head !== lastHead) { list.append(el("h4", { class: "hub-section" + (head === "Live now" ? " live-head" : ""), text: head })); lastHead = head; }
-        const right = ev.state === "upcoming" ? timeText(ev.kickoff) : `${ev.score || ""} ${ev.state === "live" ? (ev.status === "LIVE" ? "" : ev.status) : "FT"}`.trim();
-        const row = el("button", { class: "item cat-row event-row" + (ev.state === "live" ? " live" : ""), type: "button" },
-          el("div", { class: "grow" },
-            el("div", { class: "title", text: `${ev.home} v ${ev.away}` }),
-            group === UPCOMING || !(group.items.length > 1 || sp.item.competition) ? el("div", { class: "sub", text: ev.league }) : null),
-          ev.state === "live" ? el("span", { class: "live-dot", text: "LIVE" }) : null,
-          el("span", { class: "event-right", text: right }),
-          el("span", { class: "chev", text: "›" }));
-        row.addEventListener("click", () => openSportsEvent(ev));
-        list.append(row);
-      }
-      panel.append(list);
-      return;
+    const body = el("div", { class: "hub-body" + (tv && hasTable ? " with-table" : "") });
+    hub.append(body);
+    const list = el("div", { class: "hub-list" });
+    body.append(list);
+    if (tv && hasTable) {
+      body.append(el("aside", { class: "hub-side" },
+        el("div", { class: "hub-side-head", text: /basketball|baseball|american|hockey/i.test(dest.sport || "") ? "Standings" : "Table" }),
+        hubTableEl(sp.table, true)));
     }
 
-    // 4. Channels for the match
+    if (sp.view === "table" && !tv && dest.code !== "UPCOMING") {
+      if (hasTable) list.append(hubTableEl(sp.table, false));
+      else list.append(hubEmpty(sp.tableTried ? "No table for this competition." : "Loading the table…"));
+    } else {
+      hubFixtureList(list, tv, hasTable);
+    }
+
+    if (sp.picker) hub.append(hubPicker(tv));
+  }
+
+  const hubSportName = (ev) => {
+    const s = String(ev.sport || "").trim();
+    if (!s) return "";
+    if (/soccer/i.test(s)) return "Football";
+    if (/^football$/i.test(s) || /american football/i.test(s)) return "American Football";
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  };
+  const hubEmpty = (text, sub) => el("div", { class: "hub-empty" },
+    el("div", { class: "hub-empty-title", text }), sub ? el("div", { class: "hub-empty-sub", text: sub }) : null);
+
+  function hubFixtureList(list, tv, hasTable) {
+    const sp = remote.sports;
+    const dest = sp.dest;
+    if (!sp.events) { list.append(hubSkeleton(tv)); return; }
+    let evs = sp.events;
+    const upcoming = dest.code === "UPCOMING";
+    if (upcoming) { if (sp.filter && sp.filter !== "All") evs = evs.filter((e) => hubSportName(e) === sp.filter); }
+    else if (sp.view === "results") evs = evs.filter((e) => e.state === "finished");
+    else evs = evs.filter((e) => e.state !== "finished");
+    if (!evs.length) {
+      list.append(hubEmpty(upcoming ? "Nothing live or coming up" : sp.view === "results" ? "No recent results" : "No fixtures this week",
+        upcoming ? "Live now and the next 24 hours, from every competition in their hub." : null));
+      return;
+    }
+    // The crest bay / league line shows when the list spans competitions, as in the app.
+    const many = upcoming || dest.all || !dest.competition && new Set(evs.map((e) => e.league)).size > 1;
+    const showCrest = tv ? !hasTable || many : many;
+    let head = "";
+    for (const ev of evs) {
+      // Upcoming keeps the app's own groups (and order); a competition goes live, then by day.
+      const h = upcoming && ev.group ? ev.group : ev.state === "live" ? "Live now" : dayText(ev.kickoff);
+      if (h !== head) {
+        head = h;
+        const isLive = /^live/i.test(h);
+        list.append(el("div", { class: "hub-day" + (isLive ? " live" : "") },
+          isLive ? el("span", { class: "hub-pulse" }) : null, el("span", { text: h })));
+      }
+      list.append(tv ? hubCardTV(ev, showCrest) : hubCardPhone(ev, showCrest));
+    }
+  }
+
+  function hubSkeleton(tv) {
+    const box = el("div", { class: "hub-skeleton" });
+    box.append(el("div", { class: "hub-day sk" }, el("span", { class: "sk-bar w1" })));
+    for (let i = 0; i < (tv ? 4 : 5); i++) box.append(el("div", { class: "fx " + (tv ? "fx-tv" : "fx-ios") + " sk-card" }));
+    return box;
+  }
+
+  // ----- Ticker (LiveScoreStrip): today's whole card, on a belt -----
+  function hubTicker(events) {
+    const today = new Date().toDateString();
+    const day = events.filter((e) => e.state === "live" || new Date(e.kickoff * 1000).toDateString() === today);
+    if (!day.length) return null;
+    const rank = (e) => (e.state === "live" ? 0 : e.state === "upcoming" ? 1 : 2);
+    day.sort((a, b) => rank(a) - rank(b) || a.kickoff - b.kickoff);
+    const live = day.filter((e) => e.state === "live").length;
+    const chips = () => {
+      const out = [];
+      let league = "";
+      for (const e of day.slice(0, 40)) {
+        if (e.league !== league) {
+          league = e.league;
+          out.push(el("span", { class: "tk-league" }, hubCrest(e.leagueLogo, e.league, "xs"), el("span", { text: e.league })));
+        }
+        const [a, b] = hubScores(e);
+        const lead = hubLead(e), trail = hubTrail(e);
+        const chip = e.tournament
+          ? el("button", { class: "tk-chip", type: "button", tabindex: "-1" }, el("span", { class: "tk-team", text: e.home || e.league }),
+            e.state === "live" ? el("span", { class: "tk-clock", text: "LIVE" }) : e.state === "finished" ? el("span", { class: "tk-ft", text: "FINAL" }) : el("span", { class: "tk-time", text: timeText(e.kickoff) }))
+          : el("button", { class: "tk-chip" + (e.state === "live" ? " live" : ""), type: "button", tabindex: "-1" },
+          el("span", { class: "tk-team", text: shortTeam(lead.name) }),
+          e.state === "upcoming" ? el("span", { class: "tk-time", text: timeText(e.kickoff) })
+            : el("span", { class: "tk-score", text: `${a ?? ""}–${b ?? ""}` }),
+          el("span", { class: "tk-team", text: shortTeam(trail.name) }),
+          e.state === "live" ? el("span", { class: "tk-clock", text: hubClock(e) })
+            : e.state === "finished" ? el("span", { class: "tk-ft", text: hubDone(e) }) : null);
+        chip.addEventListener("click", () => openSportsEvent(e, "UPCOMING"));
+        out.push(chip);
+      }
+      return out;
+    };
+    const lane = el("div", { class: "tk-lane" }, el("div", { class: "tk-run" }, chips()), el("div", { class: "tk-run", "aria-hidden": "true" }, chips()));
+    lane.style.setProperty("--tk-dur", Math.max(30, day.length * 5) + "s");
+    return el("div", { class: "hub-ticker" },
+      el("div", { class: "tk-badge" + (live ? " live" : "") }, live ? el("span", { class: "hub-pulse" }) : null, el("span", { text: live ? `${live} LIVE` : "TODAY" })),
+      el("div", { class: "tk-window" }, lane));
+  }
+  const shortTeam = (n) => {
+    const s = String(n || "");
+    return s.length > 14 && s.includes(" ") ? s.split(" ").filter((w) => !/^(fc|afc|cf|sc)$/i.test(w)).slice(0, 2).join(" ") : s;
+  };
+
+  // ----- Header (HubLeagueHeader): crest, SPORT · N LIVE, name ▾, the places switch -----
+  function hubHeader(tv) {
+    const sp = remote.sports;
+    const dest = sp.dest;
+    const live = (sp.events || []).filter((e) => e.state === "live").length;
+    const place = dest.code === "UPCOMING";
+    const logo = dest.logo || (!place && (sp.events || []).find((e) => e.leagueLogo) || {}).leagueLogo;
+    const crest = place ? el("span", { class: "hub-place-ico", "aria-hidden": "true" }, hubCalendarIcon()) : hubCrest(logo, dest.name, "head");
+    const eyebrow = (place ? "Sports Hub" : dest.sport || "Sports Hub").toUpperCase() + (live ? ` · ${live} LIVE` : "");
+    const title = el("button", { class: "hub-title", type: "button", "aria-haspopup": "dialog" },
+      el("span", { class: "hub-title-text", text: dest.label || dest.name }), el("span", { class: "hub-caret", text: "▾" }));
+    title.addEventListener("click", () => { sp.picker = true; sp.pickQuery = ""; sp.pickSport = dest.sport || null; renderRemote(); });
+    const up = el("button", { class: "hub-seg" + (place ? " on" : ""), type: "button", title: "Upcoming" },
+      hubCalendarIcon(), el("span", { text: "Upcoming" }));
+    up.addEventListener("click", () => hubOpen(UPCOMING_DEST));
+    return el("div", { class: "hub-head" },
+      crest,
+      el("div", { class: "hub-head-text" },
+        el("div", { class: "hub-eyebrow" + (live ? " live" : ""), text: eyebrow }),
+        title),
+      el("div", { class: "hub-places" }, up),
+      tv ? el("div", { class: "hub-clock", text: new Date().toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" }) }) : null);
+  }
+  function hubCalendarIcon() {
+    const s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    s.setAttribute("viewBox", "0 0 24 24");
+    s.innerHTML = '<rect x="3.5" y="5" width="17" height="15.5" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M3.5 10h17M8 3v4M16 3v4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="12" cy="15" r="1.6" fill="currentColor"/>';
+    return s;
+  }
+
+  // ----- Cards (StunningFixtureCard) -----
+  function hubCardTV(ev, showCrest) {
+    const live = ev.state === "live", done = ev.state === "finished";
+    const lead = hubLead(ev), trail = hubTrail(ev);
+    const [a, b] = hubScores(ev);
+    const card = el("button", { class: "fx fx-tv" + (live ? " live" : "") + (done ? " done" : "") + (hubPlaying(ev) ? " playing" : ""), type: "button" });
+    if (ev.round) card.append(el("span", { class: "fx-notch", text: String(ev.round).toUpperCase() }));
+    if (ev.tournament) {
+      card.append(el("div", { class: "fx-tourn" },
+        el("div", { class: "fx-tourn-name", text: ev.home || ev.league }),
+        el("div", { class: "fx-tourn-sub" }, live ? el("span", { class: "fx-chip live", text: hubClock(ev) }) : done ? el("span", { class: "fx-chip", text: hubDone(ev) }) : el("span", { text: `${dayText(ev.kickoff)} · ${timeText(ev.kickoff)}` }))));
+    } else {
+      const win = (x, y) => done && x !== undefined && y !== undefined && x > y;
+      card.append(
+        el("div", { class: "fx-side lead" + (win(a, b) ? " win" : "") }, el("span", { class: "fx-name", text: lead.name }), hubCrest(lead.logo, lead.name, "team")),
+        el("div", { class: "fx-centre" },
+          live || done ? [
+            el("span", { class: "fx-chip" + (live ? " live" : ""), text: live ? hubClock(ev) : hubDone(ev) }),
+            a !== undefined ? el("div", { class: "fx-score" }, el("span", { text: String(a) }), el("span", { class: "dash", text: "-" }), el("span", { text: String(b) })) : null,
+          ] : [
+            ev.awayFirst ? el("span", { class: "fx-at", text: "@" }) : null,
+            el("div", { class: "fx-time", text: timeText(ev.kickoff) }),
+            hubSoon(ev) ? el("div", { class: "fx-when", text: hubSoon(ev) }) : null,
+          ]),
+        el("div", { class: "fx-side trail" + (win(b, a) ? " win" : "") }, hubCrest(trail.logo, trail.name, "team"), el("span", { class: "fx-name", text: trail.name })));
+    }
+    if (showCrest) card.append(el("div", { class: "fx-bay" }, hubCrest(ev.leagueLogo, ev.league, "bay")));
+    if (hubPlaying(ev)) card.append(el("span", { class: "fx-on", text: "On their TV" }));
+    card.addEventListener("click", () => openSportsEvent(ev));
+    return card;
+  }
+
+  function hubCardPhone(ev, showLeague) {
+    const live = ev.state === "live", done = ev.state === "finished";
+    const lead = hubLead(ev), trail = hubTrail(ev);
+    const [a, b] = hubScores(ev);
+    const rail = el("div", { class: "fx-rail" },
+      live ? [el("span", { class: "fx-live", text: "LIVE" }), hubClock(ev) !== "LIVE" ? el("span", { class: "fx-clock", text: hubClock(ev) }) : el("span", { class: "fx-dot" })]
+        : done ? [el("span", { class: "fx-ft", text: "FT" }), el("span", { class: "fx-date", text: new Date(ev.kickoff * 1000).toLocaleDateString(undefined, { day: "numeric", month: "short" }) })]
+          : el("span", { class: "fx-ko", text: timeText(ev.kickoff) }));
+    const row = (t, s, o) => {
+      const win = done && s !== undefined && o !== undefined && s > o;
+      return el("div", { class: "fx-team" + (win ? " win" : "") + (done && !win ? " lost" : "") },
+        el("span", { class: "fx-disc" }, hubCrest(t.logo, t.name, "phone")),
+        el("span", { class: "fx-name", text: t.name }),
+        (live || done) && s !== undefined ? el("span", { class: "fx-pts", text: String(s) }) : null);
+    };
+    const teams = ev.tournament
+      ? el("div", { class: "fx-teams" }, el("div", { class: "fx-team" }, el("span", { class: "fx-disc" }, hubCrest(ev.leagueLogo, ev.league, "phone")), el("span", { class: "fx-name", text: ev.home || ev.league })),
+        ev.round ? el("div", { class: "fx-tourn-line", text: String(ev.round).toUpperCase() }) : null)
+      : el("div", { class: "fx-teams" }, row(lead, a, b), el("div", { class: "fx-rule" }), row(trail, b, a));
+    const leagueBits = showLeague
+      ? [hubCrest(ev.leagueLogo, ev.league, "xs"), el("span", { class: "fx-league", text: ev.league }), ev.round && !ev.tournament ? el("span", { class: "fx-round", text: "· " + String(ev.round).toUpperCase() }) : null]
+      : ev.round && !ev.tournament ? [el("span", { class: "fx-league", text: String(ev.round) })] : [];
+    const card = el("button", { class: "fx fx-ios" + (live ? " live" : "") + (done ? " done" : "") + (hubPlaying(ev) ? " playing" : ""), type: "button" },
+      el("div", { class: "fx-main" }, rail, teams),
+      el("div", { class: "fx-bar" },
+        el("span", { class: "fx-bar-left" }, leagueBits),
+        el("span", { class: "fx-bar-right" }, hubPlaying(ev) ? el("span", { class: "fx-on", text: "On their TV" }) : null,
+          live ? null : el("span", { text: done ? new Date(ev.kickoff * 1000).toLocaleDateString(undefined, { weekday: "short" }) : hubShortDate(ev.kickoff) }),
+          el("span", { class: "fx-chev", text: "›" }))));
+    card.addEventListener("click", () => openSportsEvent(ev));
+    return card;
+  }
+
+  // ----- A match: the hero, Match centre, then where to watch it -----
+  function hubEventPage(hub, tv) {
+    const sp = remote.sports;
     const ev = sp.event;
-    panel.append(crumb([["Sports", back], [sp.item.name, () => { sp.event = null; sp.channels = null; renderRemote(); }], [`${ev.home} v ${ev.away}`, null]]));
-    const mcBtn = el("button", { class: "btn small", type: "button", text: "Match centre ›" });
-    mcBtn.addEventListener("click", () => openMatchCentre(ev.id, { code: sp.item.code, league: ev.league }));
-    panel.append(el("div", { class: "card event-card" },
-      el("div", { class: "row-actions tight" },
-        el("div", { class: "grow" },
-          el("div", { class: "title-lg", text: `${ev.home} v ${ev.away}` }),
-          el("div", { class: "sub", text: ev.state === "upcoming" ? `${dayText(ev.kickoff)} · ${timeText(ev.kickoff)}` : `${ev.score || ""} · ${ev.state === "live" ? "Live now" : "Finished"}` })),
-        mcBtn)));
-    if (!sp.channels) { panel.append(el("p", { class: "empty", text: "Finding the channels showing it…" })); return; }
-    if (!sp.channels.length) { panel.append(el("p", { class: "empty", text: "None of their channels are showing this one." })); return; }
-    panel.append(el("p", { class: "hint", text: "Best match first, the same list as Watch in their Sports Hub, by playlist." }));
-    panel.append(...bySource(sp.channels, (c) => channelRow(c, { fixture: ev.id, code: sp.item.code })));
+    const dest = sp.dest || UPCOMING_DEST;
+    const back = el("button", { class: "hub-back", type: "button", text: "‹ " + (dest.label || dest.name) });
+    back.addEventListener("click", () => { sp.event = null; sp.channels = null; renderRemote(); });
+    const live = ev.state === "live", done = ev.state === "finished";
+    const lead = hubLead(ev), trail = hubTrail(ev);
+    const [a, b] = hubScores(ev);
+    const side = (t, cls) => el("div", { class: "hx-team " + cls }, hubCrest(t.logo, t.name, "big"), el("div", { class: "hx-name", text: t.name }));
+    const mid = el("div", { class: "hx-mid" },
+      live || done ? [el("span", { class: "fx-chip" + (live ? " live" : ""), text: live ? hubClock(ev) : hubDone(ev) }),
+        a !== undefined ? el("div", { class: "hx-score", text: `${a} - ${b}` }) : null]
+        : [el("div", { class: "hx-time", text: timeText(ev.kickoff) }), el("div", { class: "hx-when", text: dayText(ev.kickoff) })]);
+    const mcBtn = el("button", { class: "btn small hx-mc", type: "button", text: "Match centre ›" });
+    mcBtn.addEventListener("click", () => openMatchCentre(ev.id, { code: sp.eventCode || dest.code, league: ev.league }));
+    hub.append(el("div", { class: "hub-head hub-head-back" }, back));
+    hub.append(el("div", { class: "hx" },
+      el("div", { class: "hx-league" }, hubCrest(ev.leagueLogo, ev.league, "xs"), el("span", { text: ev.league + (ev.round ? " · " + ev.round : "") })),
+      ev.tournament ? el("div", { class: "hx-row" }, el("div", { class: "hx-tourn", text: ev.home || ev.league }), mid)
+        : el("div", { class: "hx-row" }, side(lead, "lead"), mid, side(trail, "trail")),
+      el("div", { class: "hx-actions" }, mcBtn)));
+
+    const watch = el("div", { class: "hub-watch" }, el("div", { class: "hub-day" }, el("span", { text: "Watch" })));
+    hub.append(watch);
+    if (!sp.channels) { watch.append(hubEmpty("Finding the channels showing it…")); return; }
+    if (!sp.channels.length) { watch.append(hubEmpty("None of their channels are showing this one.")); return; }
+    watch.append(el("p", { class: "hint", text: "Best match first, the same list as Watch in their Sports Hub. It plays full screen on their TV." }));
+    watch.append(...bySource(sp.channels, (c) => channelRow(c, { fixture: ev.id, code: sp.eventCode || dest.code })));
+  }
+
+  // ----- Table -----
+  function hubTableGroups(t) {
+    if (!t) return [];
+    if (t.groups && t.groups.length) return t.groups.filter((g) => g.table && g.table.length);
+    return t.table && t.table.length ? [{ name: "", table: t.table }] : [];
+  }
+  function hubTableEl(t, compact) {
+    const groups = hubTableGroups(t);
+    const box = el("div", { class: "hub-table" + (compact ? " compact" : "") });
+    const noDraws = groups.every((g) => g.table.every((r) => !r.drawn));
+    const soccer = /soccer|football/i.test(t.sport || "") && !/american/i.test(t.sport || "");
+    for (const g of groups) {
+      const rows = g.table.map((r) => el("tr", {},
+        el("td", { class: "rk", text: String(r.rank) }),
+        el("td", { class: "team" }, hubCrest(r.team.logo, r.team.name, "row"), el("span", { text: r.team.name })),
+        el("td", { text: String(r.played) }),
+        compact ? null : [el("td", { text: String(r.won) }), noDraws ? null : el("td", { text: String(r.drawn) }), el("td", { text: String(r.lost) })],
+        el("td", { text: (r.goalsDiff > 0 ? "+" : "") + Math.round(r.goalsDiff || 0) }),
+        el("td", { class: "pts", text: String(r.points) })));
+      box.append(el("div", { class: "hub-table-group" },
+        g.name ? el("div", { class: "hub-table-name", text: g.name }) : null,
+        el("table", {},
+          el("thead", {}, el("tr", {}, el("th", { class: "rk", text: "#" }), el("th", { class: "team", text: "Team" }), el("th", { text: "P" }),
+            compact ? null : [el("th", { text: "W" }), noDraws ? null : el("th", { text: "D" }), el("th", { text: "L" })],
+            el("th", { text: soccer ? "GD" : "+/-" }), el("th", { class: "pts", text: "Pts" }))),
+          el("tbody", {}, rows))));
+    }
+    return box;
+  }
+
+  // ----- The competition picker (HubCompetitionSwitcher): sports, then their competitions -----
+  function hubPicker(tv) {
+    const sp = remote.sports;
+    const sports = hubSports();
+    if (!sp.pickSport || !sports.some((s) => s.name === sp.pickSport)) sp.pickSport = sports[0] ? sports[0].name : null;
+    const close = () => { sp.picker = false; renderRemote(); };
+    const grid = el("div", { class: "pk-grid" });
+    const fillGrid = () => {
+      const q = (sp.pickQuery || "").trim().toLowerCase();
+      const items = q ? sports.flatMap((s) => s.items).filter((i) => (i.label || i.name).toLowerCase().includes(q))
+        : ((sports.find((s) => s.name === sp.pickSport) || {}).items || []);
+      const cur = sp.dest ? hubKey(sp.dest) : "";
+      grid.replaceChildren(...items.map((it) => {
+        const t = el("button", { class: "pk-tile" + (hubKey(it) === cur ? " on" : ""), type: "button" },
+          hubCrest(it.logo, it.name, "tile"), el("span", { class: "pk-name", text: it.label || it.name }),
+          q ? el("span", { class: "pk-sport", text: it.sport }) : null);
+        t.addEventListener("click", () => hubOpen(it));
+        return t;
+      }));
+      if (!items.length) grid.append(el("p", { class: "pk-none", text: q ? "No competition by that name in their hub." : "Nothing shown for this sport." }));
+    };
+    fillGrid();
+    const search = el("input", { class: "pk-search", type: "search", placeholder: "Search competitions", value: sp.pickQuery || "", autocomplete: "off" });
+    search.addEventListener("input", () => { sp.pickQuery = search.value; fillGrid(); });
+    const sportBtn = (name, onClick, on) => {
+      const b = el("button", { class: "pk-sport-btn" + (on ? " on" : ""), type: "button", text: name });
+      b.addEventListener("click", onClick);
+      return b;
+    };
+    const upBtn = sportBtn("Upcoming", () => hubOpen(UPCOMING_DEST), false);
+    upBtn.classList.add("place");
+    const column = el("div", { class: "pk-sports" }, upBtn,
+      sports.map((s) => sportBtn(s.name, () => { sp.pickSport = s.name; sp.pickQuery = ""; search.value = ""; column.querySelectorAll(".pk-sport-btn").forEach((n) => n.classList.toggle("on", n.textContent === s.name && !n.classList.contains("place"))); fillGrid(); }, s.name === sp.pickSport)));
+    const x = el("button", { class: "pk-close", type: "button", "aria-label": "Close", text: tv ? "Close" : "Done" });
+    x.addEventListener("click", close);
+    const sheet = el("div", { class: "pk-sheet", role: "dialog", "aria-label": "Competitions" },
+      el("div", { class: "pk-top" }, el("div", { class: "pk-title", text: "Competitions" }), x),
+      search,
+      el("div", { class: "pk-body" }, column, grid));
+    const dim = el("div", { class: "pk-dim" }, sheet);
+    dim.addEventListener("click", (e) => { if (e.target === dim) close(); });
+    dim.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
+    setTimeout(() => { if (tv) search.focus({ preventScroll: true }); }, 0);
+    return dim;
   }
 
   // ---------- Copy Setup: read your own device, write theirs ----------
