@@ -543,7 +543,9 @@
     if (!localCats[kind]) localCats[kind] = ((snapshot.categories || {})[kind] || []).map((c) => ({ ...c }));
     return localCats[kind];
   }
-  const sourceOf = (c) => c.key.slice(0, c.key.indexOf("|"));
+  // Groups are the app's: one per playlist, then all custom categories together, Trakt, add-ons.
+  const sourceOf = (c) => c.group || c.key.slice(0, c.key.indexOf("|"));
+  const GROUP_RANK = { custom: 1, trakt: 2, addons: 3 };
 
   function sourcesFor(kind) {
     const out = [];
@@ -553,7 +555,9 @@
       if (!seen.has(id)) { seen.set(id, { id, name: c.source || "Playlist", cats: [] }); out.push(seen.get(id)); }
       seen.get(id).cats.push(c);
     }
-    return out;
+    // Each source lists its categories in the playlist's own order, whatever is switched on.
+    for (const src of out) src.cats.sort((x, y) => (x.n ?? 0) - (y.n ?? 0));
+    return out.sort((x, y) => (GROUP_RANK[x.id] || 0) - (GROUP_RANK[y.id] || 0));
   }
 
   function queueCategorySave(kind) {
@@ -566,21 +570,23 @@
     }, 700);
   }
 
-  // Switching one on adds it at the end of its playlist's block, as the app does.
+  // Switching one on adds it at the end of its group in Display Order, as the app does. The
+  // playlist's own list doesn't move: tiles stay in playlist order.
   function setShown(kind, cats, on) {
-    const all = catsFor(kind);
+    let order = catsFor(kind).filter((x) => x.shown);
     for (const c of cats) {
       if (c.shown === on) continue;
       c.shown = on;
       if (on) {
         const src = sourceOf(c);
-        const shownOrder = all.filter((x) => x.shown && x !== c);
         let at = -1;
-        shownOrder.forEach((x, i) => { if (sourceOf(x) === src) at = i; });
-        shownOrder.splice(at === -1 ? shownOrder.length : at + 1, 0, c);
-        localCats[kind] = [...shownOrder, ...all.filter((x) => !x.shown)];
+        order.forEach((x, i) => { if (sourceOf(x) === src) at = i; });
+        order.splice(at === -1 ? order.length : at + 1, 0, c);
+      } else {
+        order = order.filter((x) => x !== c);
       }
     }
+    localCats[kind] = [...order, ...catsFor(kind).filter((x) => !x.shown)];
     renderCategories(kind);
     queueCategorySave(kind);
   }
@@ -624,31 +630,66 @@
     }
   }
 
+  // Display Order, grouped exactly as the app shows it: Pinned, then Custom Categories and each
+  // playlist. Things move within their group (that's how the app orders them).
   function renderDisplayOrder(kind, panel) {
     const all = catsFor(kind);
     const shown = all.filter((c) => c.shown);
-    panel.append(el("p", { class: "hint", text: "Drag ⠿ to reorder, or use ⤒ top / ⤓ bottom · Remove hides it" }));
-    const list = el("div", { class: "list" });
-    if (!shown.length) list.append(el("p", { class: "empty", text: "Nothing is switched on. Pick categories from a playlist above." }));
-    const move = (from, to) => {
-      const order = moveIndex(all.filter((c) => c.shown), from, to);
-      localCats[kind] = [...order, ...all.filter((c) => !c.shown)];
-      renderCategories(kind);
-      queueCategorySave(kind);
-    };
-    const rows = shown.map((c, i) => {
-      const remove = el("button", { class: "btn small danger", type: "button", text: "Remove" });
-      remove.addEventListener("click", () => setShown(kind, [c], false));
-      const row = el("div", { class: "item" },
-        dragHandle(c.name),
-        el("span", { class: "num", text: String(i + 1) }),
-        el("div", { class: "grow" }, el("div", { class: "title", text: c.name }), el("div", { class: "sub", text: c.source })),
-        ...moveButtons(i, shown.length, move), remove);
-      list.append(row);
-      return row;
-    });
-    sortable(rows, move);
-    panel.append(list);
+    panel.append(el("p", { class: "hint", text: "Drag ⠿ to reorder within a group, or use ⤒ top / ⤓ bottom · Remove switches it off" }));
+    if (!shown.length) {
+      panel.append(el("p", { class: "empty", text: "Nothing is switched on. Pick categories from a playlist above." }));
+    }
+
+    const groups = [];
+    const pinned = ((snapshot.displayGroups || {})[kind] || []).find((g) => g.pinned);
+    if (pinned && pinned.items.length) {
+      const byKey = new Map(all.map((c) => [c.key, c]));
+      groups.push({ id: "pinned", title: "Pinned", pinned: true,
+        cats: pinned.items.map((k, i) => byKey.get(k) || { key: k, name: (pinned.names || [])[i] || "Category", source: "" }) });
+    }
+    const index = new Map();
+    for (const c of shown) {
+      const id = sourceOf(c);
+      if (!index.has(id)) { index.set(id, groups.length); groups.push({ id, title: c.source || "Playlist", cats: [] }); }
+      groups[index.get(id)].cats.push(c);
+    }
+
+    // Group order as the app has it (Pinned, Trakt, Addons, Custom, then playlists).
+    const deviceOrder = ((snapshot.displayGroups || {})[kind] || []).map((g) => g.id);
+    const rank = (g) => g.pinned ? -1 : (deviceOrder.indexOf(g.id) === -1 ? 999 : deviceOrder.indexOf(g.id));
+    groups.sort((x, y) => rank(x) - rank(y));
+
+    for (const g of groups) {
+      panel.append(el("h4", { class: "hub-section", text: `${g.title} (${g.cats.length})` }));
+      const list = el("div", { class: "list" });
+      const move = (from, to) => {
+        const next = moveIndex(g.cats, from, to);
+        if (!g.pinned) {
+          // Put the group's members back into the same slots of the overall order, in the new order.
+          const members = new Set(g.cats);
+          let k = 0;
+          const order = all.filter((c) => c.shown).map((c) => (members.has(c) ? next[k++] : c));
+          localCats[kind] = [...order, ...all.filter((c) => !c.shown)];
+        } else {
+          pinned.items = next.map((c) => c.key);
+          pinned.names = next.map((c) => c.name);
+        }
+        renderCategories(kind);
+        run("reorderGroup", { kind, group: g.id, keys: next.map((c) => c.key) });
+      };
+      const rows = g.cats.map((c, i) => {
+        const remove = el("button", { class: "btn small danger", type: "button", text: g.pinned ? "Unpin" : "Remove" });
+        remove.addEventListener("click", () => g.pinned ? run("unpinCategory", { key: c.key }, remove) : setShown(kind, [c], false));
+        const row = el("div", { class: "item" }, dragHandle(c.name),
+          el("span", { class: "num", text: String(i + 1) }),
+          el("div", { class: "grow" }, el("div", { class: "title", text: c.name })),
+          ...moveButtons(i, g.cats.length, move), remove);
+        list.append(row);
+        return row;
+      });
+      sortable(rows, move);
+      panel.append(list);
+    }
   }
 
   function renderSource(kind, panel, source) {
@@ -676,11 +717,31 @@
         return b;
       }));
 
-    panel.append(
-      el("div", { class: "source-tools" }, search, el("div", { class: "row-actions tight" }, selectAll, clear)),
-      sortRow);
+    const isPlaylist = !GROUP_RANK[source.id];
+    panel.append(el("div", { class: "source-tools" }, search, el("div", { class: "row-actions tight" }, selectAll, clear)));
+    if (isPlaylist) panel.append(sortRow);
 
     const q = catSearch[kind].trim().toLowerCase();
+    if (source.id === "custom") {
+      // Custom categories: switch on/off, or delete ones they no longer want (as the Category
+      // Manager on the device does).
+      panel.append(el("p", { class: "hint", text: "Their own categories, made on the device. Delete removes it everywhere, including from their other devices through iCloud." }));
+      const list = el("div", { class: "list" });
+      for (const c of source.cats.filter((x) => !q || x.name.toLowerCase().includes(q))) {
+        const del = el("button", { class: "btn small danger", type: "button", text: "Delete" });
+        del.addEventListener("click", () => {
+          if (confirm(`Delete the custom category "${c.name}" from their device? This can't be undone.`)) {
+            run("deleteCustomCategory", { id: c.customID }, del);
+          }
+        });
+        list.append(el("div", { class: "item" },
+          el("div", { class: "grow" }, el("div", { class: "title", text: c.name })),
+          hubSwitch(c.shown ? "on" : "off", "Show " + c.name, async () => setShown(kind, [c], !c.shown)), del));
+      }
+      if (!list.children.length) list.append(el("p", { class: "empty", text: "No custom categories." }));
+      panel.append(list);
+      return;
+    }
     const matches = source.cats.filter((c) => !q || c.name.toLowerCase().includes(q));
     const LIMIT = 300;
     const grid = el("div", { class: "cat-grid" });
