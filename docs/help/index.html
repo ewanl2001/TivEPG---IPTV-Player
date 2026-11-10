@@ -108,14 +108,20 @@
     <div id="loading-banner" class="banner" hidden></div>
 
     <nav class="tabs" role="tablist">
-      <button class="tab active" data-tab="playlists" role="tab">Playlists</button>
+      <button class="tab active" data-tab="health" role="tab">Check-up<span id="health-badge" class="tab-badge" hidden></span></button>
+      <button class="tab" data-tab="playlists" role="tab">Playlists</button>
       <button class="tab" data-tab="live" role="tab">TV Channels</button>
       <button class="tab" data-tab="vod" role="tab">Movies</button>
       <button class="tab" data-tab="series" role="tab">Series</button>
       <button class="tab" data-tab="sports" role="tab">Sports Hub</button>
+      <button class="tab" data-tab="favourites" role="tab">Favourites &amp; Home</button>
+      <button class="tab" data-tab="settings" role="tab">Settings</button>
+      <button class="tab" data-tab="remote" role="tab">Remote</button>
+      <button class="tab" data-tab="copy" role="tab">Copy Setup</button>
     </nav>
 
-    <div id="tab-playlists" class="tab-panel">
+    <div id="tab-health" class="tab-panel"></div>
+    <div id="tab-playlists" class="tab-panel" hidden>
       <p class="hint">Their playlists. Fix a login, switch one on or off, or add a new one. After a change their device reloads that playlist by itself.</p>
       <div id="server-list"></div>
       <div class="row-actions">
@@ -153,6 +159,10 @@
     <div id="tab-series" class="tab-panel" hidden></div>
 
     <div id="tab-sports" class="tab-panel" hidden></div>
+    <div id="tab-favourites" class="tab-panel" hidden></div>
+    <div id="tab-settings" class="tab-panel" hidden></div>
+    <div id="tab-remote" class="tab-panel" hidden></div>
+    <div id="tab-copy" class="tab-panel" hidden></div>
   </section>
 
   <!-- 4. Finished -->

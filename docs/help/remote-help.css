@@ -315,3 +315,38 @@ input:focus, select:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgb
   .hub-row.depth-2 { padding-left: 34px; }
   .hub-row.depth-3 { padding-left: 44px; }
 }
+
+/* ---------- Check-up ---------- */
+.tab-badge { display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 6px; margin-left: 6px; border-radius: 999px; background: var(--red); color: #fff; font-size: 12px; font-weight: 800; }
+.health-head { display: flex; align-items: flex-start; gap: 12px; margin-bottom: 10px; }
+.health-head .grow { flex: 1; }
+.health-head h3 { font-size: 22px; }
+.health-dot { flex: 0 0 auto; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-weight: 900; font-size: 15px; }
+.health-error .health-dot { background: rgba(229,72,77,.2); color: #ff8a8d; }
+.health-warn .health-dot { background: rgba(242,169,59,.2); color: var(--amber); }
+.health-info .health-dot { background: rgba(95,183,230,.18); color: var(--blue); }
+.health-ok .health-dot { background: rgba(70,194,122,.18); color: var(--green); }
+.title.wrap, .hub-row .title.wrap { white-space: normal; }
+.fix-note { max-width: 220px; text-align: right; }
+.small-spin { width: 30px; height: 30px; margin: 20px auto; border-width: 3px; }
+
+/* ---------- Settings ---------- */
+.setting-wide { flex-wrap: wrap; }
+.setting-wide > .grow { flex: 1 1 260px; }
+.seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.setting-select { width: auto; min-width: 200px; height: 42px; }
+.stepper { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.setting-value { min-width: 78px; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; }
+.stepper input[type=range] { width: 180px; height: 30px; padding: 0; border: 0; background: none; box-shadow: none; accent-color: var(--brand-blue); }
+
+/* ---------- Remote ---------- */
+.now-playing { margin-top: 0; }
+.np-row { align-items: center; }
+.title-lg { font-size: 22px; font-weight: 800; letter-spacing: -0.01em; }
+
+/* ---------- Copy Setup ---------- */
+.copy-steps { margin-top: 10px; grid-template-columns: 1fr !important; }
+.small-code { height: 64px; font-size: 34px; margin: 10px 0; }
+.copy-row { cursor: pointer; margin: 0; color: var(--text); font-size: 17px; font-weight: 400; }
+.copy-row input { width: 22px; height: 22px; flex: 0 0 auto; accent-color: var(--brand-blue); }
+.ok-banner { background: rgba(70,194,122,.1); border-color: rgba(70,194,122,.35); color: var(--green); margin-bottom: 12px; }

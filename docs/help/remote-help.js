@@ -291,14 +291,16 @@
   });
 
   // ---------- tabs ----------
-  let currentTab = "playlists";
-  for (const tab of document.querySelectorAll(".tab")) {
-    tab.addEventListener("click", () => {
-      currentTab = tab.dataset.tab;
-      for (const t of document.querySelectorAll(".tab")) t.classList.toggle("active", t === tab);
-      for (const name of ["playlists", "live", "vod", "series", "sports"]) $("tab-" + name).hidden = name !== currentTab;
-    });
+  let currentTab = "health";
+  function showTab(name) {
+    currentTab = name;
+    for (const t of document.querySelectorAll(".tab")) {
+      t.classList.toggle("active", t.dataset.tab === name);
+      if (t.dataset.tab === name) t.scrollIntoView({ block: "nearest", inline: "nearest" });
+    }
+    for (const panel of document.querySelectorAll(".tab-panel")) panel.hidden = panel.id !== "tab-" + name;
   }
+  for (const tab of document.querySelectorAll(".tab")) tab.addEventListener("click", () => showTab(tab.dataset.tab));
 
   // ---------- rendering ----------
   function render() {
@@ -319,6 +321,17 @@
       renderCategories(kind);
     }
     renderSports();
+    // A refresh from their device must not wipe what the helper is typing or dragging.
+    const busy = (id) => {
+      const a = document.activeElement;
+      return a && $(id).contains(a) && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName);
+    };
+    if (!busy("tab-favourites")) renderFavourites();
+    if (!busy("tab-settings") && !Object.values(settingTimers).some(Boolean)) renderSettings();
+    if (!busy("tab-remote")) renderRemote();
+    if (!busy("tab-copy")) renderCopy();
+    if (!healthState.requested) runHealthCheck();
+    else renderHealth();
   }
 
   // Playlists
@@ -884,6 +897,439 @@
     }
     panel.append(el("p", { class: "hint foot-note",
       text: "A switch shows or hides that part of the Sports Hub - blue means only some of it is shown. Your favourites always appear in Favourites, whatever is hidden here." }));
+  }
+
+  // ---------- Check-up: what's wrong, with a Fix button where there is one ----------
+  const healthState = { requested: false, running: false, data: null };
+
+  async function runHealthCheck() {
+    healthState.requested = true;
+    healthState.running = true;
+    renderHealth();
+    const r = await command("healthCheck", {});
+    healthState.running = false;
+    healthState.data = r.ok ? r.health : { error: r.message };
+    renderHealth();
+  }
+
+  async function healthFix(fix, button) {
+    switch (fix.type) {
+      case "addServer":
+        showTab("playlists");
+        $("add-server").hidden = false;
+        $("add-server").scrollIntoView({ behavior: "smooth", block: "center" });
+        return;
+      case "editServer":
+        openEditors.add(fix.id);
+        renderServers();
+        showTab("playlists");
+        return;
+      case "enableServer":
+        await run("setServerEnabled", { id: fix.id, enabled: true }, button);
+        break;
+      case "refreshGuide":
+        await run("refreshGuide", {}, button);
+        break;
+      case "reload":
+        await run("reload", {}, button);
+        break;
+      default:
+        return;
+    }
+    setTimeout(runHealthCheck, 4000);
+  }
+
+  function renderHealth() {
+    const panel = $("tab-health");
+    panel.replaceChildren();
+    const data = healthState.data;
+    const again = el("button", { class: "btn small", type: "button", text: healthState.running ? "Checking…" : "Check again" });
+    again.disabled = healthState.running;
+    again.addEventListener("click", runHealthCheck);
+
+    const problems = data && data.problems || 0;
+    const badge = $("health-badge");
+    badge.hidden = !problems;
+    badge.textContent = String(problems);
+
+    let headline = "Checking their setup…";
+    if (data && data.error) headline = data.error;
+    else if (data) headline = problems ? `${problems} thing${problems === 1 ? "" : "s"} to sort out` : "Everything looks good";
+    panel.append(el("div", { class: "health-head" },
+      el("div", { class: "grow" },
+        el("h3", { text: headline }),
+        el("p", { class: "hint", text: "We check each playlist's login and expiry, the TV guide and the app version on their device." })),
+      again));
+    if (healthState.running && !data) { panel.append(el("div", { class: "spinner small-spin" })); return; }
+    if (!data || !data.items) return;
+
+    const order = { error: 0, warn: 1, info: 2, ok: 3 };
+    const items = [...data.items].sort((a, b) => order[a.severity] - order[b.severity]);
+    const list = el("div", { class: "hub-card" });
+    for (const item of items) {
+      const icon = { error: "!", warn: "!", info: "i", ok: "✓" }[item.severity] || "•";
+      let action = null;
+      if (item.fix && item.fix.type === "info") action = el("span", { class: "sub fix-note", text: item.fix.label });
+      else if (item.fix) {
+        action = el("button", { class: "btn small" + (item.severity === "error" ? " btn-white" : ""), type: "button", text: item.fix.label });
+        action.addEventListener("click", () => healthFix(item.fix, action));
+      }
+      list.append(el("div", { class: "hub-row health-" + item.severity },
+        el("span", { class: "health-dot", text: icon }),
+        el("div", { class: "grow" }, el("div", { class: "title wrap", text: item.title }), el("div", { class: "sub", text: item.detail })),
+        action));
+    }
+    panel.append(list);
+  }
+
+  // ---------- Favourites & Home ----------
+  function channelSearchBox(placeholder, onResults) {
+    const input = el("input", { class: "search", placeholder, autocomplete: "off" });
+    let timer = null;
+    input.addEventListener("input", () => {
+      clearTimeout(timer);
+      timer = setTimeout(async () => {
+        const q = input.value.trim();
+        if (q.length < 2) return onResults(null);
+        const r = await command("searchChannels", { query: q });
+        onResults(r.ok ? r.channels : []);
+      }, 350);
+    });
+    return input;
+  }
+
+  let favSearchResults = null;
+  function renderFavourites() {
+    const panel = $("tab-favourites");
+    const keepFocus = document.activeElement && document.activeElement.dataset.favsearch;
+    const typed = keepFocus ? document.activeElement.value : "";
+    panel.replaceChildren();
+
+    // Favourite channels
+    const favs = snapshot.favourites || [];
+    panel.append(el("h4", { class: "hub-section", text: "Favourite Channels" }));
+    const favList = el("div", { class: "list" });
+    if (!favs.length) favList.append(el("p", { class: "empty", text: "No favourite channels yet. Find one below to add it." }));
+    const moveFav = (from, to) => {
+      snapshot.favourites = moveIndex(favs, from, to);
+      renderFavourites();
+      run("favouritesOrder", { ids: snapshot.favourites.map((f) => f.id) });
+    };
+    const favRows = favs.map((f, i) => {
+      const remove = el("button", { class: "btn small danger", type: "button", text: "Remove" });
+      remove.addEventListener("click", () => run("removeFavourite", { id: f.id }, remove));
+      const row = el("div", { class: "item" }, dragHandle(f.name),
+        el("span", { class: "num", text: String(i + 1) }),
+        el("div", { class: "grow" }, el("div", { class: "title", text: f.name }), el("div", { class: "sub", text: f.missing ? "Not in their playlists any more" : f.source })),
+        ...moveButtons(i, favs.length, moveFav), remove);
+      favList.append(row);
+      return row;
+    });
+    sortable(favRows, moveFav);
+    panel.append(favList);
+
+    const search = channelSearchBox("Search their channels to add a favourite", (results) => { favSearchResults = results; renderFavourites(); });
+    search.dataset.favsearch = "1";
+    search.value = typed;
+    const results = el("div", { class: "list" });
+    for (const c of favSearchResults || []) {
+      const add = el("button", { class: "btn small", type: "button", text: c.favourite ? "★ Favourite" : "+ Add" });
+      add.disabled = c.favourite;
+      add.addEventListener("click", async () => { await run("addFavourite", { server: c.server, channel: c.channel }, add); c.favourite = true; renderFavourites(); });
+      results.append(el("div", { class: "item" }, el("div", { class: "grow" }, el("div", { class: "title", text: c.name }), el("div", { class: "sub", text: c.source })), add));
+    }
+    if (favSearchResults && !favSearchResults.length) results.append(el("p", { class: "empty", text: "No channels match." }));
+    panel.append(el("div", { class: "card" }, el("h3", { text: "Add a favourite channel" }), search, results));
+    if (keepFocus) { search.focus(); search.setSelectionRange(search.value.length, search.value.length); }
+
+    // Home rows
+    const home = snapshot.home || [];
+    const homeHead = el("div", { class: "hub-section-row" }, el("h4", { class: "hub-section", text: "Home Screen Rows" }));
+    const reset = el("button", { class: "btn small", type: "button", text: "Reset to standard rows" });
+    reset.addEventListener("click", () => { if (confirm("Put their Home screen back to the standard rows?")) run("homeReset", {}, reset); });
+    homeHead.append(reset);
+    panel.append(homeHead);
+    const homeList = el("div", { class: "list" });
+    const moveHome = (from, to) => {
+      snapshot.home = moveIndex(home, from, to);
+      renderFavourites();
+      run("homeOrder", { ids: snapshot.home.map((h) => h.id) });
+    };
+    const homeRowsEls = home.map((h, i) => {
+      const remove = el("button", { class: "btn small danger", type: "button", text: "Remove" });
+      remove.disabled = home.length <= 1;
+      remove.addEventListener("click", () => run("homeRemove", { id: h.id }, remove));
+      const row = el("div", { class: "item" }, dragHandle(h.title),
+        el("div", { class: "grow" }, el("div", { class: "title", text: h.title }), el("div", { class: "sub", text: h.kind })),
+        ...moveButtons(i, home.length, moveHome), remove);
+      homeList.append(row);
+      return row;
+    });
+    sortable(homeRowsEls, moveHome);
+    panel.append(homeList);
+    panel.append(el("p", { class: "hint", text: "New rows are added on their device: Home › Customise." }));
+
+    // Reminders
+    const reminders = snapshot.reminders || [];
+    panel.append(el("h4", { class: "hub-section", text: "Programme Reminders" }));
+    const remList = el("div", { class: "list" });
+    if (!reminders.length) remList.append(el("p", { class: "empty", text: "No reminders set." }));
+    for (const r of reminders) {
+      const when = new Date(r.start * 1000);
+      const remove = el("button", { class: "btn small danger", type: "button", text: "Remove" });
+      remove.addEventListener("click", () => run("removeReminder", { key: r.key }, remove));
+      remList.append(el("div", { class: "item" },
+        el("div", { class: "grow" }, el("div", { class: "title", text: r.title }),
+          el("div", { class: "sub", text: `${r.channel} · ${when.toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" })} ${when.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}` })),
+        remove));
+    }
+    panel.append(remList);
+  }
+
+  // ---------- Settings: the app's own Settings pages ----------
+  const settingTimers = {};
+  function renderSettings() {
+    const panel = $("tab-settings");
+    const list = snapshot.settings;
+    panel.replaceChildren();
+    if (!list) {
+      panel.append(el("p", { class: "empty", text: "Their device needs the latest TivEPG update to change settings from here." }));
+      return;
+    }
+    panel.append(el("p", { class: "hint", text: "The same options as Settings on their device. Changes apply straight away." }));
+    const sections = [];
+    for (const s of list) {
+      let sec = sections.find((x) => x.name === s.section);
+      if (!sec) { sec = { name: s.section, items: [] }; sections.push(sec); }
+      sec.items.push(s);
+    }
+    for (const sec of sections) {
+      panel.append(el("h4", { class: "hub-section", text: sec.name }));
+      const card = el("div", { class: "hub-card" });
+      for (const s of sec.items) card.append(settingRow(s));
+      panel.append(card);
+    }
+  }
+
+  function settingRow(s) {
+    const save = (value, delay = 0) => {
+      s.value = value;
+      clearTimeout(settingTimers[s.id]);
+      settingTimers[s.id] = setTimeout(async () => {
+        const r = await command("setSetting", { id: s.id, value });
+        settingTimers[s.id] = null;
+        toast(r.ok ? `${s.title}: saved.` : (r.message || "Couldn't change that."), !r.ok);
+      }, delay);
+    };
+    const label = el("div", { class: "grow" }, el("div", { class: "title wrap", text: s.title }), s.subtitle ? el("div", { class: "sub", text: s.subtitle }) : null);
+
+    if (s.kind === "toggle") {
+      const sw = hubSwitch(s.value ? "on" : "off", s.title, async () => {
+        save(!s.value);
+        sw.className = "hub-switch " + (s.value ? "on" : "off");
+        sw.setAttribute("aria-checked", s.value ? "true" : "false");
+      });
+      return el("div", { class: "hub-row" }, label, sw);
+    }
+    if (s.kind === "choice") {
+      const options = s.options || [];
+      let control;
+      if (options.length <= 4) {
+        control = el("div", { class: "seg" }, options.map((o) => {
+          const b = el("button", { class: "subtab" + (o.value === s.value ? " active" : ""), type: "button", text: o.label });
+          b.addEventListener("click", () => {
+            save(o.value);
+            for (const x of control.children) x.classList.toggle("active", x === b);
+          });
+          return b;
+        }));
+      } else {
+        control = el("select", { class: "setting-select", "aria-label": s.title }, options.map((o) => {
+          const opt = el("option", { value: o.value, text: o.label });
+          if (o.value === s.value) opt.selected = true;
+          return opt;
+        }));
+        control.addEventListener("change", () => save(control.value));
+      }
+      return el("div", { class: "hub-row setting-wide" }, label, control);
+    }
+    // number: − value + and a slider, with the app's own labels for every step
+    const steps = s.labels || [];
+    const indexOf = (v) => Math.round((v - s.min) / s.step);
+    const valueAt = (i) => Math.round((s.min + i * s.step) * 1000) / 1000;
+    const out = el("span", { class: "setting-value", text: s.label });
+    const range = el("input", { type: "range", min: "0", max: String(Math.max(0, steps.length - 1)), step: "1", value: String(indexOf(s.value)), "aria-label": s.title });
+    const set = (i, delay) => {
+      i = Math.max(0, Math.min(steps.length - 1, i));
+      range.value = String(i);
+      out.textContent = steps[i] || "";
+      save(valueAt(i), delay);
+    };
+    const minus = el("button", { class: "btn small icon", type: "button", "aria-label": "Less", text: "−" });
+    const plus = el("button", { class: "btn small icon", type: "button", "aria-label": "More", text: "+" });
+    minus.addEventListener("click", () => set(Number(range.value) - 1, 250));
+    plus.addEventListener("click", () => set(Number(range.value) + 1, 250));
+    range.addEventListener("input", () => set(Number(range.value), 400));
+    return el("div", { class: "hub-row setting-wide" }, label, el("div", { class: "stepper" }, minus, out, plus, range));
+  }
+
+  // ---------- Remote: what's on, go to a tab, put a channel on ----------
+  let remoteResults = null;
+  const TABS = [["Home", "Home"], ["Guide", "Guide"], ["Sports Hub", "Sports Hub"], ["Movies", "Movies"], ["Series", "Series"], ["Settings", "Settings"]];
+  function renderRemote() {
+    const panel = $("tab-remote");
+    const keepFocus = document.activeElement && document.activeElement.dataset.remotesearch;
+    const typed = keepFocus ? document.activeElement.value : "";
+    panel.replaceChildren();
+    const np = snapshot.nowPlaying || {};
+    const stop = el("button", { class: "btn small danger", type: "button", text: "Stop" });
+    stop.addEventListener("click", () => run("stopPlayback", {}, stop));
+    panel.append(el("div", { class: "card now-playing" },
+      el("div", { class: "sub", text: "ON THEIR SCREEN NOW" }),
+      el("div", { class: "row-actions tight np-row" },
+        el("div", { class: "grow title-lg", text: np.active ? np.name : "Nothing playing" }),
+        np.active ? stop : null)));
+
+    panel.append(el("h4", { class: "hub-section", text: "Go to" }));
+    panel.append(el("div", { class: "row-actions" }, TABS.map(([tab, label]) => {
+      const b = el("button", { class: "btn", type: "button", text: label });
+      b.addEventListener("click", () => run("goTo", { tab }, b));
+      return b;
+    })));
+
+    panel.append(el("h4", { class: "hub-section", text: "Put a channel on" }));
+    const search = channelSearchBox("Type a channel name, e.g. BBC One", (results) => { remoteResults = results; renderRemote(); });
+    search.dataset.remotesearch = "1";
+    search.value = typed;
+    panel.append(search);
+    const results = el("div", { class: "list" });
+    for (const c of remoteResults || []) {
+      const watch = el("button", { class: "btn small btn-white", type: "button", text: "▶ Watch" });
+      watch.addEventListener("click", () => run("playChannel", { server: c.server, channel: c.channel }, watch));
+      results.append(el("div", { class: "item" }, el("div", { class: "grow" }, el("div", { class: "title", text: c.name }), el("div", { class: "sub", text: c.source })), watch));
+    }
+    if (remoteResults && !remoteResults.length) results.append(el("p", { class: "empty", text: "No channels match." }));
+    panel.append(results);
+    panel.append(el("p", { class: "hint", text: "The channel starts full screen on their device straight away." }));
+    if (keepFocus) { search.focus(); search.setSelectionRange(search.value.length, search.value.length); }
+  }
+
+  // ---------- Copy Setup: read your own device, write theirs ----------
+  // Your setup lives on your own device, not on a server, so this page connects to it too, for
+  // a moment, with its own Remote Help number. Nothing is stored anywhere.
+  const copyState = { setup: null, busy: false, error: "", parts: new Set(["categories", "favourites", "sports", "settings", "home"]) };
+  const COPY_PARTS = [
+    ["playlists", "Playlists (logins)", "Adds your playlists to their device. Skips ones they already have."],
+    ["categories", "TV channel, movie and series categories", "Which are shown, and their order. Only for playlists you both have."],
+    ["favourites", "Favourite channels", "Only for playlists you both have."],
+    ["home", "Home screen rows", "The rows and their order."],
+    ["sports", "Sports Hub", "Shown sports and competitions, favourite teams and competitions."],
+    ["settings", "Settings and themes", "Guide size, themes, player options, which tabs show."],
+  ];
+
+  async function fetchSetup(sourceCode) {
+    const kp = await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, false, ["deriveBits"]);
+    const pub = b64e(await crypto.subtle.exportKey("raw", kp.publicKey));
+    return new Promise((resolve, reject) => {
+      let key = null;
+      let settled = false;
+      const parts = new Map();
+      const sock = new WebSocket(`${RELAY}?code=${sourceCode}&role=helper&hid=${hid}`);
+      const finish = (fn, value) => { if (settled) return; settled = true; clearTimeout(timer); try { sock.close(); } catch {} fn(value); };
+      const timer = setTimeout(() => finish(reject, new Error("Your device didn't answer. Is Remote Help open on it?")), 45000);
+      const send = async (obj) => {
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        const c = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, te.encode(JSON.stringify(obj)));
+        sock.send(JSON.stringify({ t: "enc", id: String(Math.random()), i: 0, n: 1, iv: b64e(iv), c: b64e(c) }));
+      };
+      sock.onmessage = async (event) => {
+        if (event.data === "pong") return;
+        let msg; try { msg = JSON.parse(event.data); } catch { return; }
+        if (msg.t === "peer" && msg.state === "joined") sock.send(JSON.stringify({ t: "hello", pub }));
+        else if (msg.t === "hello") {
+          const peer = await crypto.subtle.importKey("raw", b64d(msg.pub), { name: "ECDH", namedCurve: "P-256" }, false, []);
+          const bits = await crypto.subtle.deriveBits({ name: "ECDH", public: peer }, kp.privateKey, 256);
+          const hk = await crypto.subtle.importKey("raw", bits, "HKDF", false, ["deriveKey"]);
+          key = await crypto.subtle.deriveKey({ name: "HKDF", hash: "SHA-256", salt: te.encode("tivepg-remote-help:" + sourceCode), info: te.encode("TivEPG Remote Help v1") },
+            hk, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+          await send({ type: "hi", name: (helperName || "You") + " (copying your setup)" });
+          await send({ type: "exportSetup", req: "copy-1" });
+        } else if (msg.t === "enc" && key) {
+          const got = parts.get(msg.id) || [];
+          got[msg.i] = msg.c;
+          if (got.filter((p) => p !== undefined).length < msg.n) { parts.set(msg.id, got); return; }
+          parts.delete(msg.id);
+          try {
+            const plain = JSON.parse(td.decode(await crypto.subtle.decrypt({ name: "AES-GCM", iv: b64d(msg.iv) }, key, b64d(got.join("")))));
+            if (plain.type === "result" && plain.req === "copy-1") {
+              plain.ok && plain.setup ? finish(resolve, plain.setup) : finish(reject, new Error(plain.message || "Your device couldn't share its setup. Update TivEPG on it."));
+            }
+          } catch (e) { /* the snapshot it also sends isn't needed here */ }
+        }
+      };
+      sock.onclose = (event) => {
+        const why = { 4003: "That number is already in use by someone else.", 4004: "That number didn't work. Check it on your device's Remote Help screen.", 4029: "Too many tries. Wait a minute." };
+        finish(reject, new Error(why[event.code] || "Couldn't connect to your device."));
+      };
+    });
+  }
+
+  function renderCopy() {
+    const panel = $("tab-copy");
+    panel.replaceChildren();
+    panel.append(el("p", { class: "hint", text: "Copy your own TivEPG setup onto their device. Your setup is on your own device, so this page connects to it for a moment too. Nothing is stored." }));
+
+    if (!copyState.setup) {
+      const code2 = el("input", { class: "code-input small-code", inputmode: "numeric", maxlength: "7", placeholder: "000 000", "aria-label": "Your device's number" });
+      code2.addEventListener("input", () => {
+        const d = code2.value.replace(/\D/g, "").slice(0, 6);
+        code2.value = d.length > 3 ? d.slice(0, 3) + " " + d.slice(3) : d;
+      });
+      const go = el("button", { class: "btn btn-white", type: "button", text: copyState.busy ? "Getting your setup…" : "Get my setup" });
+      go.disabled = copyState.busy;
+      go.addEventListener("click", async () => {
+        const digits = code2.value.replace(/\D/g, "");
+        if (digits.length !== 6) { copyState.error = "The number has 6 digits."; return renderCopy(); }
+        if (digits === code) { copyState.error = "That's their device's number. Use the one on YOUR device."; return renderCopy(); }
+        copyState.busy = true; copyState.error = ""; renderCopy();
+        try { copyState.setup = await fetchSetup(digits); }
+        catch (e) { copyState.error = e.message; }
+        copyState.busy = false;
+        renderCopy();
+      });
+      panel.append(el("ol", { class: "how copy-steps" },
+        el("li", {}, el("span", { class: "how-num", text: "1" }), el("div", {}, el("b", { text: "On YOUR iPhone, iPad, Mac or Apple TV" }), el("p", { text: "Open TivEPG › Settings › Remote Help. It shows a number." }))),
+        el("li", {}, el("span", { class: "how-num", text: "2" }), el("div", {}, el("b", { text: "Type that number here" }), code2, go,
+          copyState.error ? el("p", { class: "error", text: copyState.error }) : null))));
+      return;
+    }
+
+    const s = copyState.setup;
+    const count = (k) => (s.categories && s.categories[k] || []).length;
+    panel.append(el("div", { class: "banner ok-banner", text: `Got your setup from your ${s.from || "device"}: ${(s.servers || []).length} playlist(s), ${count("live") + count("vod") + count("series")} categories, ${(s.favourites || []).length} favourite channels. You can press Stop on your device now.` }));
+    const card = el("div", { class: "hub-card" });
+    for (const [id, title, detail] of COPY_PARTS) {
+      const box = el("input", { type: "checkbox", id: "copy-" + id });
+      box.checked = copyState.parts.has(id);
+      box.addEventListener("change", () => { box.checked ? copyState.parts.add(id) : copyState.parts.delete(id); });
+      card.append(el("label", { class: "hub-row copy-row", for: "copy-" + id }, box,
+        el("div", { class: "grow" }, el("div", { class: "title wrap", text: title }), el("div", { class: "sub", text: detail }))));
+    }
+    panel.append(card);
+    const apply = el("button", { class: "btn btn-white", type: "button", text: "Copy to their device" });
+    apply.addEventListener("click", async () => {
+      if (!copyState.parts.size) return toast("Tick at least one thing to copy.", true);
+      if (copyState.parts.has("settings") && !confirm("This replaces their settings and themes with yours. Carry on?")) return;
+      apply.disabled = true;
+      apply.textContent = "Copying…";
+      const r = await command("importSetup", { setup: s, parts: [...copyState.parts] });
+      apply.disabled = false;
+      apply.textContent = "Copy to their device";
+      toast(r.message || (r.ok ? "Copied." : "Couldn't copy."), !r.ok);
+    });
+    const restart = el("button", { class: "btn", type: "button", text: "Use a different device" });
+    restart.addEventListener("click", () => { copyState.setup = null; renderCopy(); });
+    panel.append(el("div", { class: "row-actions" }, apply, restart));
   }
 
   // ---------- start ----------
