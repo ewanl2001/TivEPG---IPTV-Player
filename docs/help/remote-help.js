@@ -315,11 +315,16 @@
 
   function showTab(name, push = true) {
     currentTab = name;
+    document.querySelectorAll(".epg-cat-scrim").forEach((n) => n.remove());
+    try { remote.guide.catMenu = false; } catch (_) {}
     const section = SECTIONS.find((x) => x.id === name);
     $("home-grid").hidden = !!name;
     document.querySelector(".device-head").hidden = !!name;
     $("section-bar").hidden = !name;
     $("section-title").textContent = section ? section.title : "";
+    // The Remote is an app screen: one slim bar (back, its own tabs), sections pinned under it.
+    document.body.classList.toggle("remote-app", name === "remote");
+    $("remote-bar").hidden = name !== "remote";
     for (const panel of document.querySelectorAll(".tab-panel")) panel.hidden = panel.id !== "tab-" + name;
     if (push) history.pushState({ section: name, depth: 0 }, "");
     if (name === "remote") {
@@ -1737,19 +1742,26 @@
     document.body.classList.toggle("wide-guide", currentTab === "remote" && remote.mode === "guide" && !mc.open && guideIsGrid());
     const keepFocus = document.activeElement && document.activeElement.dataset.remotefilter;
     panel.replaceChildren();
+    document.querySelectorAll(".epg-cat-scrim").forEach((n) => n.remove());
     if (mc.open) { renderMatchCentre(panel); return; }
 
     // On their screen now, with the player's controls while something plays.
     const np = nowPlaying();
     renderNowPlaying(ensureDock());
 
-    const modes = el("div", { class: "subtabs remote-modes" },
+    const modes = el("div", { class: "remote-modes", role: "tablist" },
       pill("📺 Guide", null, remote.mode === "guide", () => remoteMode("guide")),
       pill("🏆 Sports Hub", null, remote.mode === "sports", () => remoteMode("sports")),
       tabOn("Movies") ? pill("🎬 Movies", null, remote.mode === "vod", () => remoteMode("vod")) : null,
       tabOn("Series") ? pill("🎞️ Series", null, remote.mode === "series", () => remoteMode("series")) : null,
       pill("Tabs", null, remote.mode === "goto", () => remoteMode("goto")));
-    panel.append(modes);
+    const scrollX = ($("remote-bar").firstChild || {}).scrollLeft || 0;
+    $("remote-bar").replaceChildren(modes);
+    modes.scrollLeft = scrollX;
+    requestAnimationFrame(() => {
+      const on = modes.querySelector(".active");
+      if (on && (on.offsetLeft < modes.scrollLeft || on.offsetLeft + on.offsetWidth > modes.scrollLeft + modes.clientWidth)) on.scrollIntoView({ inline: "center", block: "nearest" });
+    });
 
     if (remote.mode === "goto") {
       // Their tabs, as their app shows them (only the ones switched on).
@@ -2845,17 +2857,17 @@
       return;
     }
 
-    // Category pills.
-    const pills = el("div", { class: "epg-pills", role: "tablist" });
-    for (const c of cats) {
-      const on = c.key === g.category.key;
-      const b = el("button", { class: "epg-pill" + (on ? " on" : ""), type: "button", role: "tab", "aria-selected": on ? "true" : "false", text: c.name });
-      b.addEventListener("click", () => { if (!on) { g.scroll = null; g.picked = null; openGuideCategory(c); } });
-      pills.append(b);
-    }
-    shell.append(pills);
-    requestAnimationFrame(() => { const on = pills.querySelector(".on"); if (on) pills.scrollLeft = on.offsetLeft - pills.clientWidth / 2 + on.clientWidth / 2; });
-
+    // Category: a drop-down (the guide's category drawer). Scrolls; each playlist's group
+    // folds away so a long list can be skipped; remembers which groups are folded.
+    const curGroup = (g.groups || []).find((grp) => grp.items.some((c) => c.key === g.category.key));
+    const catBtn = el("button", { class: "epg-cat-btn" + (g.catMenu ? " open" : ""), type: "button", "aria-haspopup": "listbox", "aria-expanded": g.catMenu ? "true" : "false" },
+      el("span", { class: "epg-cat-text" },
+        curGroup ? el("span", { class: "epg-cat-group", text: curGroup.title }) : null,
+        el("span", { class: "epg-cat-name", text: g.category.name })),
+      el("span", { class: "epg-cat-caret", text: "▾" }));
+    catBtn.addEventListener("click", () => { g.catMenu = !g.catMenu; g.catQuery = ""; g.catScroll = null; g.catFocus = false; renderRemote(); });
+    shell.append(catBtn);
+    if (g.catMenu) document.body.append(guideCategoryMenu(g));
     // The picked programme: title, time, channel and Watch.
     if (g.picked) shell.append(guidePickedCard(g.picked));
 
@@ -2864,7 +2876,96 @@
     // Big screens (iPad, computer): the TV guide grid. Phones: a list with now and next,
     // channel names allowed to wrap so long ones stay readable.
     if (guideIsGrid()) shell.append(guideGrid(g));
-    else shell.append(el("div", { class: "list guide-list" }, g.channels.map((c) => channelRow(c))));
+    else shell.append(el("div", { class: "gl" }, g.channels.map((c) => guideListRow(c))));
+  }
+
+  const guideClosed = (() => { try { return new Set(JSON.parse(localStorage.getItem("rh-guide-closed") || "[]")); } catch (_) { return new Set(); } })();
+  const saveGuideClosed = () => { try { localStorage.setItem("rh-guide-closed", JSON.stringify([...guideClosed])); } catch (_) {} };
+  function guideCategoryMenu(g) {
+    const close = () => { g.catMenu = false; renderRemote(); };
+    const scrim = el("div", { class: "epg-cat-scrim" });
+    scrim.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
+    scrim.addEventListener("click", (e) => { if (e.target === scrim) close(); });
+    const q = (g.catQuery || "").trim().toLowerCase();
+    const find = el("input", { class: "search", placeholder: "Find a category", value: g.catQuery || "", "aria-label": "Find a category" });
+    find.dataset.catfind = "1";
+    find.addEventListener("input", () => { g.catQuery = find.value; g.catFocus = true; renderRemote(); });
+    const groups = (g.groups || []).map((grp) => ({ grp, items: grp.items.filter((c) => !q || c.name.toLowerCase().includes(q)) })).filter((x) => x.items.length);
+    const allOpen = groups.every(({ grp }) => !guideClosed.has(grp.id));
+    const toggleAll = el("button", { class: "btn small", type: "button", text: allOpen ? "Collapse all" : "Expand all" });
+    toggleAll.addEventListener("click", () => {
+      for (const { grp } of groups) allOpen ? guideClosed.add(grp.id) : guideClosed.delete(grp.id);
+      saveGuideClosed(); renderRemote();
+    });
+    const x = el("button", { class: "btn small icon", type: "button", "aria-label": "Close", text: "✕" });
+    x.addEventListener("click", close);
+    const list = el("div", { class: "epg-cat-list", role: "listbox" });
+    if (!groups.length) list.append(el("p", { class: "empty", text: "No categories match." }));
+    for (const { grp, items } of groups) {
+      const open = q ? true : !guideClosed.has(grp.id);
+      const head = el("button", { class: "epg-cat-head" + (open ? " open" : ""), type: "button", "aria-expanded": open ? "true" : "false" },
+        el("span", { class: "chev" + (open ? " open" : ""), text: "›" }),
+        el("span", { class: "grow", text: grp.title }),
+        el("span", { class: "subtab-badge", text: String(items.length) }));
+      head.addEventListener("click", () => { guideClosed.has(grp.id) ? guideClosed.delete(grp.id) : guideClosed.add(grp.id); saveGuideClosed(); renderRemote(); });
+      list.append(head);
+      if (!open) continue;
+      for (const c of items) {
+        const on = c.key === g.category.key;
+        const row = el("button", { class: "epg-cat-row" + (on ? " on" : ""), type: "button", role: "option", "aria-selected": on ? "true" : "false" },
+          el("span", { class: "grow", text: c.name }), on ? el("span", { class: "epg-cat-tick", text: "✓" }) : null);
+        row.addEventListener("click", () => { g.catMenu = false; if (!on) { g.scroll = null; g.picked = null; openGuideCategory(c); } else renderRemote(); });
+        list.append(row);
+      }
+    }
+    const saved = g.catScroll;
+    requestAnimationFrame(() => {
+      if (saved != null) list.scrollTop = saved;
+      else { const on = list.querySelector(".on"); if (on) on.scrollIntoView({ block: "center" }); }
+      if (g.catQuery !== undefined && document.activeElement !== find && g.catFocus) find.focus();
+    });
+    list.addEventListener("scroll", () => { g.catScroll = list.scrollTop; }, { passive: true });
+    find.addEventListener("focus", () => { g.catFocus = true; });
+    find.addEventListener("blur", () => { g.catFocus = false; });
+    const keepCaret = g.catFocus;
+    if (keepCaret) requestAnimationFrame(() => { find.focus(); find.setSelectionRange(find.value.length, find.value.length); });
+    scrim.append(el("div", { class: "epg-cat-menu" },
+      el("div", { class: "epg-cat-menu-head" }, el("strong", { text: "Categories" }), toggleAll, x),
+      find, list));
+    return scrim;
+  }
+
+  // A phone guide row: logo, the name (wraps to two lines), what's on now with its progress
+  // and end time, next on one line, and a round ▶ instead of a wide Watch button so the text
+  // gets the width.
+  function guideListRow(c) {
+    const on = isOnScreen(c.server + "|" + c.channel);
+    const play = el("button", { class: "gl-play" + (on ? " on" : ""), type: "button",
+      "aria-label": on ? `${c.name} is playing` : `Watch ${c.name}`, title: on ? "Playing" : "Watch" });
+    play.append(on ? el("span", { class: "gl-eq", "aria-hidden": "true" }, el("i"), el("i"), el("i")) : el("span", { class: "gl-tri", "aria-hidden": "true" }));
+    play.addEventListener("click", () => run("playChannel", { server: c.server, channel: c.channel }, play).then(() => setTimeout(pollPlayer, 1500)));
+    const now = Date.now() / 1000;
+    let bar = null;
+    if (c.nowStart && c.nowEnd) {
+      const fill = el("span", { class: "gl-fill" });
+      fill.style.width = Math.max(0, Math.min(100, ((now - c.nowStart) / (c.nowEnd - c.nowStart)) * 100)) + "%";
+      bar = el("span", { class: "gl-bar" }, fill);
+    }
+    return el("div", { class: "gl-row" + (on ? " playing" : "") },
+      art(c.image, "logo", c.name),
+      el("div", { class: "gl-main" },
+        el("div", { class: "gl-name" }, el("span", { class: "gl-name-text", text: c.name }),
+          c.catchup ? el("span", { class: "catchup-ico", role: "img", title: "Catch-up", "aria-label": "Catch-up" }) : null),
+        c.now
+          ? el("div", { class: "gl-now" }, el("span", { class: "gl-now-title", text: c.now }))
+          : el("div", { class: "gl-none", text: "No guide information" }),
+        bar || c.nowEnd ? el("div", { class: "gl-meta" }, bar, c.nowEnd ? el("span", { class: "gl-left", text: minsLeft(c.nowEnd) }) : null) : null,
+        c.next ? el("div", { class: "gl-next" }, el("span", { class: "gl-next-time", text: timeText(c.nextStart) }), el("span", { class: "gl-next-title", text: c.next })) : null),
+      play);
+  }
+  function minsLeft(end) {
+    const m = Math.max(0, Math.round((end - Date.now() / 1000) / 60));
+    return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m left` : `${m}m left`;
   }
 
   function guidePickedCard(p) {
@@ -3146,8 +3247,11 @@
 
     if (sp.event) { hubEventPage(hub, tv); return; }
 
-    if (hubSetting("sportsHubShowLiveTicker", true) !== false && sp.ticker && sp.ticker.length) hub.append(hubTicker(sp.ticker));
-    hub.append(hubHeader(tv));
+    // Ticker, header and the shelf stay pinned under the app bar while the list scrolls.
+    const top = el("div", { class: "hub-top" });
+    hub.append(top);
+    if (hubSetting("sportsHubShowLiveTicker", true) !== false && sp.ticker && sp.ticker.length) top.append(hubTicker(sp.ticker));
+    top.append(hubHeader(tv));
     if (sp.dest.code === "HIGHLIGHTS") { renderHighlights(hub, tv); if (sp.picker) hub.append(hubPicker(tv)); return; }
     const dest = sp.dest;
     const evs = sp.events;
@@ -3164,7 +3268,7 @@
           b.addEventListener("click", () => { sp.filter = s; renderRemote(); });
           strip.append(b);
         }
-        hub.append(strip);
+        top.append(strip);
       }
     } else {
       const tabs = [["fixtures", hubIsAmerican({ league: dest.code, sport: dest.sport }) ? "Schedule" : "Fixtures"], ["results", "Results"]];
@@ -3179,7 +3283,7 @@
         });
         shelf.append(b);
       }
-      hub.append(shelf);
+      top.append(shelf);
     }
 
     const body = el("div", { class: "hub-body" + (tv && hasTable ? " with-table" : "") });
