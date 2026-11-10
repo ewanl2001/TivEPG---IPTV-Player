@@ -436,3 +436,14 @@ button.item.cat-row:hover { border-color: var(--line-2); background: var(--card-
 .live-dot { font-size: 11px; font-weight: 800; letter-spacing: .06em; color: #fff; background: var(--red); padding: 3px 7px; border-radius: 6px; }
 .live-head { color: #ff8a8d; }
 .event-card { margin: 0 0 12px; }
+
+/* Display Order pins and the Remote's tab list */
+.pin-btn { white-space: nowrap; }
+.pin-btn.on { background: rgba(95,183,230,.14); border-color: rgba(95,183,230,.45); color: var(--blue); }
+.tab-ico { width: 28px; font-size: 20px; text-align: center; }
+.item.current-tab { border-color: rgba(95,183,230,.45); background: rgba(95,183,230,.08); }
+.btn-label-short { display: none; }
+@media (max-width: 560px) {
+  .pin-btn .btn-label, .item .btn.danger .btn-label { display: none; }
+  .item .btn.danger .btn-label-short { display: inline; }
+}

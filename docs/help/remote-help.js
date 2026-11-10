@@ -721,13 +721,19 @@
   function renderDisplayOrder(kind, panel) {
     const all = catsFor(kind);
     const shown = all.filter((c) => c.shown);
-    panel.append(el("p", { class: "hint", text: "Open a group, then drag ⠿ to reorder, or use ⤒ / ⤓ to move to the top or bottom of that group · Remove switches it off" }));
+    panel.append(el("p", { class: "hint", text: kind === "live"
+      ? "Open a group, then drag ⠿ to reorder, or use ⤒ / ⤓ to move to the top or bottom of that group · 📌 Pin puts it at the top of their guide · Remove switches it off"
+      : "The rows on their " + (kind === "vod" ? "Movies" : "Series") + " page, top to bottom. Drag ⠿ to reorder, or use ⤒ / ⤓ to move to the top or bottom · Remove switches it off" }));
     if (!shown.length) {
       panel.append(el("p", { class: "empty", text: "Nothing is switched on. Pick categories from a playlist above." }));
     }
 
+    // Movies and Series rails follow one overall order across playlists: one list, free moves.
+    if (kind !== "live") return renderFlatOrder(kind, panel, all, shown);
+
     const groups = [];
     const pinned = ((snapshot.displayGroups || {})[kind] || []).find((g) => g.pinned);
+    const pinnedKeys = new Set(pinned ? pinned.items : []);
     if (pinned && pinned.items.length) {
       const byKey = new Map(all.map((c) => [c.key, c]));
       groups.push({ id: "pinned", title: "Pinned", pinned: true,
@@ -783,18 +789,54 @@
         run("reorderGroup", { kind, group: g.id, keys: next.map((c) => c.key) });
       };
       const rows = g.cats.map((c, i) => {
-        const remove = el("button", { class: "btn small danger", type: "button", text: g.pinned ? "Unpin" : "Remove" });
+        const remove = el("button", { class: "btn small danger", type: "button", "aria-label": g.pinned ? "Unpin" : "Remove" },
+          el("span", { class: "btn-label-short", text: "✕" }), el("span", { class: "btn-label", text: g.pinned ? "Unpin" : "Remove" }));
         remove.addEventListener("click", () => g.pinned ? run("unpinCategory", { key: c.key }, remove) : setShown(kind, [c], false));
+        // Pin: puts it in Pinned at the top of their guide, as the pin in the app's Display Order.
+        let pin = null;
+        if (!g.pinned) {
+          const isPinned = pinnedKeys.has(c.key);
+          pin = el("button", { class: "btn small pin-btn" + (isPinned ? " on" : ""), type: "button",
+            title: isPinned ? "Unpin from the top of the guide" : "Pin to the top of the guide",
+            "aria-label": isPinned ? "Unpin" : "Pin" },
+            "📌", el("span", { class: "btn-label", text: isPinned ? " Pinned" : " Pin" }));
+          pin.addEventListener("click", () => run(isPinned ? "unpinCategory" : "pinCategory", { key: c.key }, pin));
+        }
         const row = el("div", { class: "item" }, dragHandle(c.name),
           el("span", { class: "num", text: String(i + 1) }),
           el("div", { class: "grow" }, el("div", { class: "title", text: c.name })),
-          ...moveButtons(i, g.cats.length, move), remove);
+          ...moveButtons(i, g.cats.length, move), pin, remove);
         list.append(row);
         return row;
       });
       sortable(rows, move);
       panel.append(list);
     }
+  }
+
+  function renderFlatOrder(kind, panel, all, shown) {
+    if (!shown.length) return;
+    const many = new Set(shown.map(sourceOf)).size > 1;
+    const list = el("div", { class: "list" });
+    const move = (from, to) => {
+      const next = moveIndex(shown, from, to);
+      localCats[kind] = [...next, ...all.filter((c) => !c.shown)];
+      renderCategories(kind);
+      run("reorderGroup", { kind, group: "all", keys: next.map((c) => c.key) });
+    };
+    const rows = shown.map((c, i) => {
+      const remove = el("button", { class: "btn small danger", type: "button", text: "Remove" });
+      remove.addEventListener("click", () => setShown(kind, [c], false));
+      const row = el("div", { class: "item" }, dragHandle(c.name),
+        el("span", { class: "num", text: String(i + 1) }),
+        el("div", { class: "grow" }, el("div", { class: "title", text: c.name }),
+          many ? el("div", { class: "sub", text: c.source || "" }) : null),
+        ...moveButtons(i, shown.length, move), remove);
+      list.append(row);
+      return row;
+    });
+    sortable(rows, move);
+    panel.append(list);
   }
 
   function renderSource(kind, panel, source) {
@@ -1342,8 +1384,8 @@
   }
 
   // ---------- Remote: browse their guide and Sports Hub, and put things on their screen ----------
-  // Picking Guide or Sports Hub switches their device to it too, and choosing a guide category
-  // moves their guide to it, so you're both looking at the same thing.
+  // Browsing here never touches their screen (changing tab stops what's playing): only Watch
+  // and the Tabs buttons do anything on their device.
   const remote = {
     mode: "guide",
     guide: { groups: null, open: new Set(["pinned"]), category: null, channels: null, filter: "" },
@@ -1366,11 +1408,9 @@
     remote.mode = mode;
     remoteRefreshEvery(0);
     if (mode === "guide") {
-      command("goTo", { tab: "Guide" });
       if (remote.guide.category) openGuideCategory(remote.guide.category, false);
       else loadGuideGroups();
     } else if (mode === "sports") {
-      command("goTo", { tab: "Sports Hub" });
       if (remote.sports.item) openSportsItem(remote.sports.item);
     }
     renderRemote();
@@ -1386,15 +1426,15 @@
     remote.guide.category = cat;
     if (follow) remote.guide.channels = null;
     renderRemote();
-    const load = async (followTV) => {
-      const r = await command("guideChannels", { key: cat.key, follow: followTV });
+    const load = async () => {
+      const r = await command("guideChannels", { key: cat.key });
       if (remote.guide.category && remote.guide.category.key === cat.key) {
         remote.guide.channels = r.ok ? r.channels : [];
         if (!busy("tab-remote")) renderRemote();
       }
     };
-    await load(follow);
-    remoteRefreshEvery(60000, () => load(false));
+    await load();
+    remoteRefreshEvery(60000, load);
   }
 
   async function openSportsItem(item) {
@@ -1470,21 +1510,37 @@
       el("div", { class: "sub", text: "ON THEIR SCREEN NOW" }),
       el("div", { class: "row-actions tight np-row" },
         el("div", { class: "grow title-lg", text: np.active ? np.name : "Nothing playing" }),
-        np.active ? stop : null)));
+        np.active ? stop : null),
+      snapshot.currentTab ? el("div", { class: "sub", text: `${np.active && np.fullScreen ? "Full screen, over" : "On"} the ${snapshot.currentTab} tab` }) : null));
 
     const modes = el("div", { class: "subtabs remote-modes" },
       pill("📺 Guide", null, remote.mode === "guide", () => remoteMode("guide")),
       pill("🏆 Sports Hub", null, remote.mode === "sports", () => remoteMode("sports")),
-      pill("Go to…", null, remote.mode === "goto", () => remoteMode("goto")));
+      pill("Tabs", null, remote.mode === "goto", () => remoteMode("goto")));
     panel.append(modes);
 
     if (remote.mode === "goto") {
-      panel.append(el("p", { class: "hint", text: "Opens that part of the app on their screen." }));
-      panel.append(el("div", { class: "row-actions" }, [["Home", "Home"], ["Guide", "Guide"], ["Sports Hub", "Sports Hub"], ["Movies", "Movies"], ["Series", "Series"], ["Settings", "Settings"]].map(([tab, label]) => {
-        const b = el("button", { class: "btn", type: "button", text: label });
-        b.addEventListener("click", () => run("goTo", { tab }, b));
-        return b;
-      })));
+      // Their tabs, as their app shows them (only the ones switched on).
+      const tabs = snapshot.tabs || ["Home", "Guide", "Series", "Movies", "Sports Hub", "Settings"];
+      panel.append(el("p", { class: "hint", text: np.active
+        ? "Switches the tab on their screen. This stops what's playing."
+        : "Switches the tab on their screen." }));
+      const ICONS = { "Home": "🏠", "Guide": "📺", "Series": "🎞️", "Movies": "🎬", "Sports Hub": "🏆", "Settings": "⚙️" };
+      const list = el("div", { class: "list" });
+      for (const tab of tabs) {
+        const here = snapshot.currentTab === tab;
+        const row = el("button", { class: "item cat-row" + (here ? " current-tab" : ""), type: "button" },
+          el("span", { class: "tab-ico", text: ICONS[tab] || "•" }),
+          el("span", { class: "grow title", text: tab }),
+          here ? el("span", { class: "subtab-badge", text: "On screen" }) : el("span", { class: "chev", text: "›" }));
+        row.addEventListener("click", () => {
+          if (here && !(np.active && np.fullScreen)) return;
+          if (np.active && !confirm(`Switch them to ${tab}? This stops ${np.name}.`)) return;
+          run("goTo", { tab }, row);
+        });
+        list.append(row);
+      }
+      panel.append(list);
       return;
     }
 
@@ -1508,7 +1564,7 @@
     const g = remote.guide;
     if (!g.category) {
       if (!g.groups) { panel.append(el("p", { class: "empty", text: "Loading their guide…" })); if (g.groups === null) loadGuideGroups(); g.groups = g.groups || undefined; return; }
-      panel.append(el("p", { class: "hint", text: "Their guide's categories, in the same order. Pick one and their guide moves to it." }));
+      panel.append(el("p", { class: "hint", text: "Their guide's categories, in the same order. Browsing here doesn't change their screen; Watch puts a channel on." }));
       panel.append(filterBox("Find a category"));
       const q = g.filter.trim().toLowerCase();
       if (!g.groups.length) panel.append(el("p", { class: "empty", text: "No TV channel categories are switched on." }));
@@ -1545,16 +1601,25 @@
     panel.append(list);
   }
 
+  const UPCOMING = { id: "__upcoming", name: "Upcoming", items: [] };
+  const UPCOMING_ITEM = { code: "UPCOMING", name: "Upcoming" };
+
   function renderRemoteSports(panel) {
     const sp = remote.sports;
     const sports = snapshot.sports || {};
     const groups = sports.groups || [];
     if (!groups.length) { panel.append(el("p", { class: "empty", text: "Their Sports Hub hasn't loaded yet." })); return; }
 
-    // 1. Sport
+    // 1. Sport (Upcoming first, as the hub has it)
     if (!sp.group) {
-      panel.append(el("p", { class: "hint", text: "Pick a sport, then a competition, then the match." }));
+      panel.append(el("p", { class: "hint", text: "Pick a sport, then a competition, then the match. Browsing here doesn't change their screen." }));
       const list = el("div", { class: "list" });
+      const up = el("button", { class: "item cat-row", type: "button" },
+        el("div", { class: "grow" }, el("div", { class: "title", text: "Upcoming" }),
+          el("div", { class: "sub", text: "Live now and the next 24 hours, every competition" })),
+        el("span", { class: "chev", text: "›" }));
+      up.addEventListener("click", () => { sp.group = UPCOMING.id; openSportsItem(UPCOMING_ITEM); });
+      list.append(up);
       for (const g of groups) {
         const row = el("button", { class: "item cat-row", type: "button" },
           el("div", { class: "grow" }, el("div", { class: "title", text: g.name }), el("div", { class: "sub", text: g.subtitle })),
@@ -1565,7 +1630,7 @@
       panel.append(list);
       return;
     }
-    const group = groups.find((g) => g.id === sp.group);
+    const group = sp.group === UPCOMING.id ? UPCOMING : groups.find((g) => g.id === sp.group);
     if (!group) { sp.group = null; return renderRemote(); }
     const back = () => { sp.group = null; sp.item = null; sp.events = null; remoteRefreshEvery(0); renderRemote(); };
 
@@ -1589,20 +1654,21 @@
 
     // 3. Events
     if (!sp.event) {
-      panel.append(crumb([["Sports", back], [group.name, () => { sp.item = null; sp.events = null; remoteRefreshEvery(0); renderRemote(); }], [sp.item.name, null]]));
+      panel.append(crumb(group === UPCOMING ? [["Sports", back], ["Upcoming", null]]
+        : [["Sports", back], [group.name, () => { sp.item = null; sp.events = null; remoteRefreshEvery(0); renderRemote(); }], [sp.item.name, null]]));
       if (!sp.events) { panel.append(el("p", { class: "empty", text: "Loading matches…" })); return; }
       const evs = sp.events.list;
-      if (!evs.length) { panel.append(el("p", { class: "empty", text: "No matches in the next week." })); return; }
+      if (!evs.length) { panel.append(el("p", { class: "empty", text: group === UPCOMING ? "Nothing live or coming up in the next 24 hours." : "No matches in the next week." })); return; }
       let lastHead = "";
       const list = el("div", { class: "list" });
       for (const ev of evs) {
-        const head = ev.state === "live" ? "Live now" : ev.state === "finished" ? "Results" : dayText(ev.kickoff);
+        const head = ev.state === "live" ? "Live now" : ev.group || (ev.state === "finished" ? "Results" : dayText(ev.kickoff));
         if (head !== lastHead) { list.append(el("h4", { class: "hub-section" + (head === "Live now" ? " live-head" : ""), text: head })); lastHead = head; }
         const right = ev.state === "upcoming" ? timeText(ev.kickoff) : `${ev.score || ""} ${ev.state === "live" ? (ev.status === "LIVE" ? "" : ev.status) : "FT"}`.trim();
         const row = el("button", { class: "item cat-row event-row" + (ev.state === "live" ? " live" : ""), type: "button" },
           el("div", { class: "grow" },
             el("div", { class: "title", text: `${ev.home} v ${ev.away}` }),
-            group.items.length > 1 || sp.item.competition ? null : el("div", { class: "sub", text: ev.league })),
+            group === UPCOMING || !(group.items.length > 1 || sp.item.competition) ? el("div", { class: "sub", text: ev.league }) : null),
           ev.state === "live" ? el("span", { class: "live-dot", text: "LIVE" }) : null,
           el("span", { class: "event-right", text: right }),
           el("span", { class: "chev", text: "›" }));
