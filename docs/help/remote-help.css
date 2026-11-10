@@ -1228,13 +1228,15 @@ body.remote-app main:has(#screen-help:not([hidden])) { max-width: min(1680px, 10
   #tab-remote .group-stack .list { display: grid; }
 }
 @media (min-width: 1400px) {
-  /* Two columns of match cards; day headers and buttons span the row. */
-  .hub-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 16px; align-content: start; }
-  .hub-body.with-table .hub-list { grid-template-columns: minmax(0, 1fr); }
-  .hub-list > .hub-day, .hub-list > .hub-empty, .hub-list > .hub-skeleton, .hub-list > .hl-result-btn { grid-column: 1 / -1; }
-  .hub-body.with-table { grid-template-columns: minmax(0, 1fr) 400px; }
+  .hub-body.with-table { grid-template-columns: minmax(0, 1fr) 420px; }
   .hl-card { width: 340px; }
 }
+/* Match cards stay one column (never side by side) and stop growing past a readable width;
+   the hub's top (ticker, header, shelf) keeps the full width, and a table sits beside them. */
+.hub-list { max-width: 1040px; width: 100%; }
+.hub-body:not(.with-table) .hub-list { margin: 0 auto; }
+.hub-body.with-table { grid-template-columns: minmax(0, 1040px) minmax(320px, 1fr); }
+@media (max-width: 1100px) { .hub-body.with-table { grid-template-columns: minmax(0, 1fr) 300px; } }
 
 /* Guide category drop-down (replaces the pill bar). */
 .epg-cat-btn { width: 100%; display: flex; align-items: center; gap: 12px; margin-bottom: 12px; padding: 10px 16px; border-radius: 14px; cursor: pointer;
@@ -1295,3 +1297,24 @@ body.remote-app main:has(#screen-help:not([hidden])) { max-width: min(1680px, 10
 .gl-eq i:nth-child(1) { height: 60%; } .gl-eq i:nth-child(2) { height: 100%; animation-delay: .2s; } .gl-eq i:nth-child(3) { height: 40%; animation-delay: .4s; }
 @keyframes gl-eq { 50% { transform: scaleY(.4); } }
 @media (prefers-reduced-motion: reduce) { .gl-eq i { animation: none; } }
+
+/* ---------- Match centre on big screens ---------- */
+body.mc-open #tab-remote { width: 100%; max-width: 1240px; margin: 0 auto; }
+.mc-two { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; align-items: start; }
+.mc-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.mc-grid { display: grid; grid-template-columns: 1fr; gap: 12px; align-items: start; }
+@media (min-width: 900px) { .mc-grid { grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); } }
+/* A pitch is tall: keep it a size you can see whole on a laptop. */
+.mc-pitch { width: min(100%, 440px, calc((100vh - 240px) * 0.739)); margin: 0 auto; }
+@media (min-width: 900px) { .mc-pitch-card .mc-card-title { text-align: center; justify-content: center; } }
+.mc-highlights .mc-card-title svg { width: 18px; height: 18px; vertical-align: -3px; color: var(--blue); }
+.mc-hl-body { display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 10px; }
+.mc-hl-body .hl-art { max-width: 420px; }
+@media (min-width: 700px) { .mc-hl-body { grid-template-columns: 220px 1fr; align-items: center; } }
+.mc-hl-sources { display: flex; flex-direction: column; gap: 8px; }
+.mc-hl-sources .hl-src-label { color: var(--text-2); }
+@media (max-width: 699px) {
+  .mc-hl-body .hl-art { display: none; }
+  .mc-hl-sources .hl-src { display: grid; grid-template-columns: 1fr auto auto; gap: 6px; align-items: center; }
+  .mc-hl-sources .hl-src-label { font-size: 13px; }
+}

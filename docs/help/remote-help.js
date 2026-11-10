@@ -1743,6 +1743,7 @@
     const keepFocus = document.activeElement && document.activeElement.dataset.remotefilter;
     panel.replaceChildren();
     document.querySelectorAll(".epg-cat-scrim").forEach((n) => n.remove());
+    document.body.classList.toggle("mc-open", !!mc.open);
     if (mc.open) { renderMatchCentre(panel); return; }
 
     // On their screen now, with the player's controls while something plays.
@@ -1849,7 +1850,8 @@
 
   function openMatchCentre(id, opts = {}) {
     Object.assign(mc, { open: true, id, code: opts.code || null, league: opts.league || null, data: null, table: null,
-                        synced: false, delay: null, tab: null, pickedTab: false, lineupSide: "home", innings: null, groupsAll: false, error: null });
+                        synced: false, delay: null, tab: null, pickedTab: false, lineupSide: "home", innings: null, groupsAll: false, error: null,
+                        highlight: opts.highlight || null });
     remote.scrollBack = window.scrollY;
     navPush();
     renderRemote();
@@ -1875,6 +1877,7 @@
       if (r.table) mc.table = r.table;
       mc.synced = !!r.synced;
       mc.delay = r.delay ?? null;
+      if (r.highlight) mc.highlight = r.highlight;
       mc.error = null;
     } else if (!mc.data) {
       mc.error = r.message || "Couldn't load that match.";
@@ -1977,6 +1980,12 @@
       return;
     }
     panel.append(mcHeader(f));
+    const h = mc.highlight;
+    if (h && h.clips && h.clips.length) {
+      panel.append(el("div", { class: "card mc-card mc-highlights" },
+        el("div", { class: "mc-card-title" }, hubPlayIcon(), " Highlights"),
+        el("div", { class: "mc-hl-body" }, hlKitArt(h, "card"), el("div", { class: "mc-hl-sources" }, h.clips.map((c) => clipButtons(c, h))))));
+    }
     const tabs = mcTabs(f);
     if (!mc.pickedTab || !tabs.some((t) => t.id === mc.tab)) mc.tab = mcDefaultTab(f, tabs);
     panel.append(el("div", { class: "mc-tabs" }, tabs.map((t) => {
@@ -2195,9 +2204,19 @@
     if (/-R$/.test(c)) return 3;
     return 2;
   }
+  const mcWideMQ = window.matchMedia("(min-width: 900px)");
+  const mcWide = () => mcWideMQ.matches;
+  mcWideMQ.addEventListener("change", () => { if (mc.open && currentTab === "remote" && !busy("tab-remote")) renderRemote(); });
   function mcLineups(body, f) {
     const L = f.lineups || {};
     const sides = ["home", "away"].filter((s) => (L[s] || []).length);
+    // Room for both: the two teams side by side, each pitch then its bench.
+    if (mcWide() && sides.length === 2) {
+      const grid = el("div", { class: "mc-two" });
+      for (const s of sides) { const col = el("div", { class: "mc-col" }); mcLineupSide(col, f, s); grid.append(col); }
+      body.append(grid);
+      return;
+    }
     if (!sides.includes(mc.lineupSide)) mc.lineupSide = sides[0];
     body.append(el("div", { class: "subtabs mc-side-pick" }, sides.map((s) => {
       const t = f[s];
@@ -2205,7 +2224,11 @@
       b.addEventListener("click", () => { mc.lineupSide = s; renderRemote(); });
       return b;
     })));
-    const side = mc.lineupSide, team = f[side], players = L[side] || [];
+    if (sides.length) mcLineupSide(body, f, mc.lineupSide);
+  }
+  function mcLineupSide(body, f, side) {
+    const L = f.lineups || {};
+    const team = f[side], players = L[side] || [];
     const starters = players.filter((p) => p.starter !== false).slice(0, 11);
     const bench = players.filter((p) => !starters.includes(p));
     // Goals / cards / subs per player, from the (held) timeline.
@@ -2296,7 +2319,10 @@
   }
 
   // ----- H2H & Form -----
-  function mcH2H(body, f) {
+  function mcH2H(outer, f) {
+    // Form for each team and the head to head sit side by side when there's room.
+    const body = el("div", { class: "mc-grid" });
+    outer.append(body);
     const adv = f.advanced || {};
     const form = adv.form || {};
     for (const t of [f.home, f.away]) {
@@ -3183,6 +3209,12 @@
 
   async function openSportsEvent(ev, code) {
     const sp = remote.sports;
+    // A result isn't something to watch: open the match, its stats and its highlights, as the
+    // app's fixture screen does for a finished game.
+    if (ev.state === "finished") {
+      openMatchCentre(ev.id, { code: code || (sp.dest || UPCOMING_DEST).code, league: ev.league, highlight: ev.highlight });
+      return;
+    }
     sp.event = ev;
     sp.eventCode = code || (sp.dest || UPCOMING_DEST).code;
     sp.channels = null;
