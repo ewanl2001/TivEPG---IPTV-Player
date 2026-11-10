@@ -1242,7 +1242,7 @@
       remove.addEventListener("click", () => run("removeFavourite", { id: f.id }, remove));
       const row = el("div", { class: "item" }, dragHandle(f.name),
         el("span", { class: "num", text: String(i + 1) }),
-        el("div", { class: "grow" }, el("div", { class: "title", text: f.name }), el("div", { class: "sub", text: f.missing ? "Not in their playlists any more" : f.source })),
+        el("div", { class: "grow" }, chanTitle(f), el("div", { class: "sub", text: f.missing ? "Not in their playlists any more" : f.source })),
         ...moveButtons(i, favs.length, moveFav), remove);
       favList.append(row);
       return row;
@@ -1258,7 +1258,7 @@
       const add = el("button", { class: "btn small", type: "button", text: c.favourite ? "★ Favourite" : "+ Add" });
       add.disabled = c.favourite;
       add.addEventListener("click", async () => { await run("addFavourite", { server: c.server, channel: c.channel }, add); c.favourite = true; renderFavourites(); });
-      results.append(el("div", { class: "item" }, el("div", { class: "grow" }, el("div", { class: "title", text: c.name }), el("div", { class: "sub", text: c.source })), add));
+      results.append(el("div", { class: "item" }, el("div", { class: "grow" }, chanTitle(c), el("div", { class: "sub", text: c.source })), add));
     }
     if (favSearchResults && !favSearchResults.length) results.append(el("p", { class: "empty", text: "No channels match." }));
     panel.append(el("div", { class: "card" }, el("h3", { text: "Add a favourite channel" }), search, results));
@@ -1401,7 +1401,8 @@
   // and the Tabs buttons do anything on their device.
   const remote = {
     mode: "guide",
-    guide: { groups: null, open: new Set(["pinned"]), category: null, channels: null, filter: "" },
+    guide: { groups: null, open: new Set(["pinned"]), category: null, channels: null, filter: "",
+             search: null, searchFor: "", searchTimer: null },
     sports: { group: null, item: null, events: null, event: null, channels: null },
     // Movies and Series: categories in their tab's order, then titles, then (series) episodes.
     vod: { cats: null, cat: null, titles: null, more: false, query: "", searching: false, filter: "" },
@@ -1495,6 +1496,79 @@
     }));
   }
 
+  // ---------- Artwork: logos, posters, stills ----------
+  // The page loads no outside images (CSP: provider art is often plain http, and nothing here
+  // calls anyone else), so their DEVICE sends small `data:` thumbnails over the encrypted link
+  // (`thumbnails`, at most 10 a reply). Rows draw a placeholder with the first letter at once;
+  // the picture drops in when it arrives. Cached for the visit, so re-renders are instant.
+  const thumbs = { cache: new Map(), pending: new Map(), running: false, off: false };
+  function art(url, kind, label) {
+    const box = el("span", { class: `art art-${kind}`, "aria-hidden": "true" });
+    const letter = String(label || "").replace(/^(the|a)\s+/i, "").trim().charAt(0).toUpperCase();
+    box.append(el("span", { class: "art-letter", text: letter }));
+    if (!url || thumbs.off) return box;
+    const key = kind + "|" + url;
+    box.dataset.art = key;
+    const hit = thumbs.cache.get(key);
+    if (hit) setArt(box, hit);
+    else if (hit === undefined) { thumbs.pending.set(key, { url, kind }); loadThumbs(); }
+    return box;
+  }
+  function setArt(box, src) {
+    // Keeps anything laid over the picture (an episode's progress bar).
+    box.querySelectorAll(".art-letter, img").forEach((n) => n.remove());
+    box.prepend(el("img", { src, alt: "", decoding: "async" }));
+    box.classList.add("has-img");
+  }
+  async function loadThumbs() {
+    if (thumbs.running) return;
+    thumbs.running = true;
+    await new Promise((r) => setTimeout(r, 30));            // let the whole render queue up first
+    while (thumbs.pending.size && !thumbs.off) {
+      const first = thumbs.pending.values().next().value;
+      const batch = [...thumbs.pending.entries()].filter(([, v]) => v.kind === first.kind).slice(0, 10);
+      let r;
+      try { r = await command("thumbnails", { kind: first.kind, urls: batch.map(([, v]) => v.url) }); }
+      catch (_) { r = { ok: false }; }
+      if (!r.ok) { thumbs.off = true; break; }               // an older app: placeholders it is
+      const got = r.thumbs || {};
+      let progressed = false;
+      for (const [key, v] of batch) {
+        if (!(v.url in got)) continue;                        // over the reply budget: next round
+        progressed = true;
+        thumbs.pending.delete(key);
+        thumbs.cache.set(key, got[v.url]);
+        if (!got[v.url]) continue;
+        document.querySelectorAll(`[data-art="${CSS.escape(key)}"]`).forEach((b) => setArt(b, got[v.url]));
+      }
+      if (!progressed) for (const [key] of batch) { thumbs.pending.delete(key); thumbs.cache.set(key, ""); }
+    }
+    thumbs.running = false;
+  }
+
+  // Results from several playlists: one titled block per playlist (in the order they first
+  // come), like the app's own sections. One playlist: just the list.
+  function bySource(rows, makeRow, listClass = "list") {
+    const order = [], groups = new Map();
+    for (const r of rows) {
+      const k = r.source || "";
+      if (!groups.has(k)) { groups.set(k, []); order.push(k); }
+      groups.get(k).push(r);
+    }
+    if (order.length <= 1) return [el("div", { class: listClass }, rows.map(makeRow))];
+    return order.map((k) => el("section", { class: "source-group" },
+      el("div", { class: "source-head" },
+        el("span", { class: "source-name", text: k || "Other" }),
+        el("span", { class: "subtab-badge", text: String(groups.get(k).length) })),
+      el("div", { class: listClass }, groups.get(k).map(makeRow))));
+  }
+
+  // A channel's name, with the catch-up (timeshift) mark when the channel can rewind.
+  function chanTitle(c) {
+    return el("div", { class: "title chan-name" }, el("span", { class: "chan-text", text: c.name }),
+      c.catchup ? el("span", { class: "catchup-ico", role: "img", title: "Catch-up: can rewind and watch earlier programmes", "aria-label": "Catch-up" }) : null);
+  }
+
   function channelRow(c, extra) {
     const watch = el("button", { class: "btn small btn-white", type: "button", text: "▶ Watch" });
     watch.addEventListener("click", () => run("playChannel", { server: c.server, channel: c.channel, ...(extra || {}) }, watch));
@@ -1505,9 +1579,10 @@
       bar.style.width = pct + "%";
       progress = el("span", { class: "prog" }, bar);
     }
-    return el("div", { class: "item chan" },
+    return el("div", { class: "item chan with-art" },
+      art(c.image, "logo", c.name),
       el("div", { class: "grow" },
-        el("div", { class: "title", text: c.name }),
+        chanTitle(c),
         c.now ? el("div", { class: "now-line" }, el("span", { class: "now-title", text: c.now }),
           c.nowEnd ? el("span", { class: "sub", text: ` · until ${timeText(c.nowEnd)}` }) : null) : el("div", { class: "sub", text: c.source || "No guide information" }),
         progress,
@@ -1607,6 +1682,86 @@
     return b;
   }
 
+  // ---------- Catch-up scrub bar ----------
+  // Right = live, left = as far back as the span shows (2h / 6h / 24h, capped at the channel's
+  // catch-up window). Dragging shows the time and the programme there; letting go rewinds
+  // their TV to it (`timeshiftTo`). The guide's programmes for the span come from the device
+  // (`timeshiftGuide`), refreshed once a minute.
+  const scrub = { span: null, channel: null, programmes: null, fetchedAt: 0, loading: false };
+  const agoText = (sec) => {
+    sec = Math.max(0, Math.round(sec));
+    if (sec < 60) return "live";
+    const h = Math.floor(sec / 3600), m = Math.round((sec % 3600) / 60);
+    return (h ? `${h}h ${String(m).padStart(2, "0")}m` : `${m} min`) + " ago";
+  };
+  function scrubBar(np) {
+    const windowSec = np.window || 86400;
+    const behind = np.kind === "timeshift" ? Math.max(0, np.behind || 0) : 0;
+    const spans = [2, 6, 24].map((h) => h * 3600).filter((s, i) => i === 0 || s <= windowSec);
+    if (scrub.channel !== np.name) Object.assign(scrub, { channel: np.name, span: null, programmes: null, fetchedAt: 0 });
+    if (!scrub.span || behind > scrub.span) scrub.span = spans.find((s) => s >= behind) || spans[spans.length - 1];
+    const span = Math.min(scrub.span, windowSec);
+    const now = Date.now() / 1000;
+    if (!scrub.loading && (!scrub.programmes || now - scrub.fetchedAt > 60 || scrub.programmes.span !== span)) {
+      scrub.loading = true;
+      command("timeshiftGuide", { hours: span / 3600 }).then((r) => {
+        scrub.loading = false;
+        scrub.programmes = { span, list: r.ok ? r.programmes || [] : [] };
+        scrub.fetchedAt = Date.now() / 1000;
+        const box = $("np-box");
+        if (box && !remote.scrubbing) renderNowPlaying(box);
+      });
+    }
+
+    const wrap = el("div", { class: "scrub" });
+    wrap.append(el("div", { class: "scrub-head" },
+      el("span", { class: "scrub-title" }, el("span", { class: "catchup-ico", "aria-hidden": "true" }), " Catch-up"),
+      el("div", { class: "seg small" }, spans.map((sp) => {
+        const b = el("button", { class: "subtab" + (sp === span ? " active" : ""), type: "button", text: `${sp / 3600}h` });
+        b.addEventListener("click", () => { scrub.span = sp; renderNowPlaying($("np-box")); });
+        return b;
+      }))));
+
+    // The track: programme blocks under a range input (value = seconds from the left edge).
+    const track = el("div", { class: "scrub-track" });
+    const start = now - span;
+    const progs = (scrub.programmes && scrub.programmes.span === span ? scrub.programmes.list : []);
+    progs.forEach((p, i) => {
+      const a = Math.max(p.start, start), b = Math.min(p.end, now);
+      if (b <= a) return;
+      const blk = el("span", { class: "scrub-prog" + (i % 2 ? " alt" : ""), title: p.title });
+      blk.style.left = ((a - start) / span) * 100 + "%";
+      blk.style.width = ((b - a) / span) * 100 + "%";
+      if ((b - a) / span > 0.12) blk.append(el("span", { class: "scrub-prog-title", text: p.title }));
+      track.append(blk);
+    });
+    const range = el("input", { type: "range", class: "scrub-range", min: "0", max: String(Math.round(span)), step: "15",
+      value: String(Math.round(span - Math.min(behind, span))), "aria-label": "Catch-up position" });
+    track.append(range);
+    const label = el("div", { class: "scrub-label" });
+    const describe = () => {
+      const back = span - Number(range.value);
+      const at = now - back;
+      const prog = progs.find((p) => p.start <= at && p.end > at);
+      label.replaceChildren(
+        el("strong", { text: back < 60 ? "LIVE" : timeText(at) }),
+        el("span", { class: "sub", text: back < 60 ? "" : ` · ${agoText(back)}` }),
+        prog ? el("div", { class: "scrub-prog-now", text: prog.title }) : null);
+    };
+    describe();
+    range.addEventListener("pointerdown", () => { remote.scrubbing = true; });
+    range.addEventListener("touchstart", () => { remote.scrubbing = true; }, { passive: true });
+    for (const ev of ["pointercancel", "blur"]) range.addEventListener(ev, () => { remote.scrubbing = false; });
+    range.addEventListener("input", describe);
+    range.addEventListener("change", async () => {
+      remote.scrubbing = false;
+      await control({ action: "timeshiftTo", behind: span - Number(range.value) });
+    });
+    wrap.append(label, track, el("div", { class: "seek-times" },
+      el("span", { text: timeText(start) }), el("span", { class: "scrub-live", text: "LIVE" })));
+    return wrap;
+  }
+
   function renderNowPlaying(box) {
     const np = nowPlaying();
     box.replaceChildren();
@@ -1654,6 +1809,9 @@
         el("span", { class: "prog" }, bar),
         np.next ? el("div", { class: "sub", text: `Next: ${np.next} · ${timeText(np.nextStart)}` }) : null);
     }
+
+    // Catch-up: scrub anywhere in the window (their app's timeshift), programmes drawn under it.
+    if (np.catchup && np.kind !== "vod") card.append(scrubBar(np));
 
     // Transport
     const canRewind = np.kind !== "live" || np.catchup;
@@ -1769,6 +1927,7 @@
     const r = await command("seriesEpisodes", { id: show.id });
     if (st.show !== show) return;
     st.episodes = r.ok ? r.episodes : [];
+    st.cover = r.ok ? r.cover || show.image : show.image;
     if (!r.ok) toast(r.message || "Couldn't load the episodes.", true);
     // Open on the season they're part-way through, else the first.
     const watching = st.episodes.find((e) => e.progress && e.progress < 0.95);
@@ -1807,6 +1966,9 @@
     if (kind === "series" && st.show) {
       const back = searching ? "Search" : st.cat ? st.cat.name : "Series";
       panel.append(crumb([[back, () => { st.show = null; st.episodes = null; renderRemote(); }], [st.show.name, null]]));
+      panel.append(el("div", { class: "card show-head" }, art(st.cover || st.show.image, "poster", st.show.name),
+        el("div", { class: "grow" }, el("div", { class: "title-lg", text: st.show.name }),
+          el("div", { class: "sub", text: [st.show.category, st.show.year, st.show.source].filter(Boolean).join(" · ") }))));
       if (!st.episodes) { panel.append(el("p", { class: "empty", text: "Loading episodes…" })); return; }
       if (!st.episodes.length) { panel.append(el("p", { class: "empty", text: "Their provider didn't list any episodes for this one." })); return; }
       const seasons = [...new Set(st.episodes.map((e) => e.season))];
@@ -1816,11 +1978,15 @@
       }
       const list = el("div", { class: "list" });
       for (const ep of st.episodes.filter((e) => seasons.length <= 1 || e.season === st.season)) {
-        list.append(el("div", { class: "item chan" },
+        const still = art(ep.image || st.cover, "still", st.show.name);
+        if (ep.progress) still.append(progressBar(ep.progress));
+        list.append(el("div", { class: "item episode" },
+          still,
           el("div", { class: "grow" },
-            el("div", { class: "title", text: ep.episode ? `${ep.episode}. ${ep.title}` : ep.title }),
-            progressBar(ep.progress)),
-          ...playButtons(ep.id, ep)));
+            el("div", { class: "title clamp2", text: ep.episode ? `${ep.episode}. ${ep.title}` : ep.title }),
+            ep.duration ? el("div", { class: "sub", text: ep.duration }) : null,
+            ep.plot ? el("div", { class: "plot", text: ep.plot }) : null,
+            el("div", { class: "row-actions tight" }, ...playButtons(ep.id, ep)))));
       }
       panel.append(list);
       return;
@@ -1855,21 +2021,23 @@
     }
     if (!st.titles) { panel.append(el("p", { class: "empty", text: searching ? "Searching…" : "Loading…" })); return; }
     if (!st.titles.length) { panel.append(el("p", { class: "empty", text: searching ? "Nothing matches." : "Nothing in this category." })); return; }
-    const list = el("div", { class: "list" });
-    for (const t of st.titles) {
+    const titleRow = (t) => {
       const info = el("div", { class: "grow" },
-        el("div", { class: "title", text: t.name }),
+        el("div", { class: "title clamp2", text: t.name }),
+        // Search spans every category: say which one it's in (the app's row name).
+        searching && t.category ? el("div", { class: "cat-line", text: t.category }) : null,
         t.year || t.resume ? el("div", { class: "sub", text: [t.year, t.resume ? `stopped at ${fmtTime(t.resume)}` : ""].filter(Boolean).join(" · ") }) : null,
         progressBar(t.progress));
+      const poster = art(t.image, "poster", t.name);
       if (kind === "series") {
-        const row = el("button", { class: "item cat-row", type: "button" }, info, el("span", { class: "chev", text: "›" }));
+        const row = el("button", { class: "item cat-row with-art", type: "button" }, poster, info, el("span", { class: "chev", text: "›" }));
         row.addEventListener("click", () => openShow(t));
-        list.append(row);
-      } else {
-        list.append(el("div", { class: "item chan" }, info, ...playButtons(t.id, t)));
+        return row;
       }
-    }
-    panel.append(list);
+      info.append(el("div", { class: "row-actions tight vod-actions" }, ...playButtons(t.id, t)));
+      return el("div", { class: "item chan with-art" }, poster, info);
+    };
+    panel.append(...(searching ? bySource(st.titles, titleRow) : [el("div", { class: "list" }, st.titles.map(titleRow))]));
     if (st.more) {
       const more = el("button", { class: "btn", type: "button", text: "Show more" });
       more.addEventListener("click", () => loadMoreTitles(kind, more));
@@ -1880,7 +2048,25 @@
   function filterBox(placeholder) {
     const f = el("input", { class: "search", placeholder, value: remote.guide.filter });
     f.dataset.remotefilter = "1";
-    f.addEventListener("input", () => { remote.guide.filter = f.value; renderRemote(); });
+    f.addEventListener("input", () => {
+      const g = remote.guide;
+      g.filter = f.value;
+      // On the category list the box also searches every channel on their device.
+      if (!g.category) {
+        clearTimeout(g.searchTimer);
+        const q = f.value.trim().toLowerCase();
+        if (q.length >= 2 && q !== g.searchFor) {
+          g.searchTimer = setTimeout(async () => {
+            const r = await command("guideSearch", { query: q });
+            if (remote.guide.filter.trim().toLowerCase() !== q) return;
+            g.searchFor = q;
+            g.search = r.ok ? { channels: r.channels || [], more: !!r.more } : { error: r.message || "Couldn't search their channels." };
+            if (currentTab === "remote" && remote.mode === "guide" && !g.category) renderRemote();
+          }, 350);
+        }
+      }
+      renderRemote();
+    });
     return f;
   }
 
@@ -1888,9 +2074,24 @@
     const g = remote.guide;
     if (!g.category) {
       if (!g.groups) { panel.append(el("p", { class: "empty", text: "Loading their guide…" })); if (g.groups === null) loadGuideGroups(); g.groups = g.groups || undefined; return; }
-      panel.append(el("p", { class: "hint", text: "Their guide's categories, in the same order. Browsing here doesn't change their screen; Watch puts a channel on." }));
-      panel.append(filterBox("Find a category"));
+      panel.append(el("p", { class: "hint", text: "Search every channel, or open one of their guide's categories (same order as their TV). Browsing here doesn't change their screen; Watch puts a channel on." }));
+      panel.append(filterBox("Search all channels"));
       const q = g.filter.trim().toLowerCase();
+      if (q.length >= 2) {
+        // Every live channel on their switched-on playlists, then the categories that match.
+        panel.append(el("h4", { class: "hub-section", text: "Channels" }));
+        const list = el("div", { class: "list" });
+        const res = g.searchFor === q ? g.search : null;
+        if (!res) list.append(el("p", { class: "empty", text: "Searching their channels…" }));
+        else if (res.error) list.append(el("p", { class: "empty", text: res.error }));
+        else if (!res.channels.length) list.append(el("p", { class: "empty", text: "No channels match." }));
+        else list.append(...bySource(res.channels, (c) => channelRow(c), "group-stack"));
+        if (res && res.more) list.append(el("p", { class: "hint", text: "Showing the first 80. Type more of the name to narrow it down." }));
+        panel.append(list);
+        if (g.groups.some((grp) => grp.items.some((c) => c.name.toLowerCase().includes(q)))) {
+          panel.append(el("h4", { class: "hub-section", text: "Categories" }));
+        }
+      }
       if (!g.groups.length) panel.append(el("p", { class: "empty", text: "No TV channel categories are switched on." }));
       for (const grp of g.groups) {
         const items = grp.items.filter((c) => !q || c.name.toLowerCase().includes(q));
@@ -1906,7 +2107,7 @@
         const list = el("div", { class: "list group-list" });
         for (const c of items) {
           const row = el("button", { class: "item cat-row", type: "button" }, el("span", { class: "grow title", text: c.name }), el("span", { class: "chev", text: "›" }));
-          row.addEventListener("click", () => { g.filter = ""; openGuideCategory(c); });
+          row.addEventListener("click", () => { g.filter = ""; g.search = null; g.searchFor = ""; openGuideCategory(c); });
           list.append(row);
         }
         panel.append(list);
@@ -1921,7 +2122,7 @@
     const list = el("div", { class: "list" });
     const rows = g.channels.filter((c) => !q || c.name.toLowerCase().includes(q) || (c.now || "").toLowerCase().includes(q));
     if (!rows.length) list.append(el("p", { class: "empty", text: q ? "Nothing matches." : "No channels in this category." }));
-    for (const c of rows) list.append(channelRow(c));
+    else list.append(...bySource(rows, (c) => channelRow(c), "group-stack"));
     panel.append(list);
   }
 
@@ -2011,10 +2212,8 @@
       el("div", { class: "sub", text: ev.state === "upcoming" ? `${dayText(ev.kickoff)} · ${timeText(ev.kickoff)}` : `${ev.score || ""} · ${ev.state === "live" ? "Live now" : "Finished"}` })));
     if (!sp.channels) { panel.append(el("p", { class: "empty", text: "Finding the channels showing it…" })); return; }
     if (!sp.channels.length) { panel.append(el("p", { class: "empty", text: "None of their channels are showing this one." })); return; }
-    panel.append(el("p", { class: "hint", text: "Best match first, the same list as Watch in their Sports Hub." }));
-    const list = el("div", { class: "list" });
-    for (const c of sp.channels) list.append(channelRow(c, { fixture: ev.id, code: sp.item.code }));
-    panel.append(list);
+    panel.append(el("p", { class: "hint", text: "Best match first, the same list as Watch in their Sports Hub, by playlist." }));
+    panel.append(...bySource(sp.channels, (c) => channelRow(c, { fixture: ev.id, code: sp.item.code })));
   }
 
   // ---------- Copy Setup: read your own device, write theirs ----------
@@ -2295,7 +2494,7 @@
         remove.addEventListener("click", () => customAction("customCategoryRemove", { id: cat.id, server: ch.server, channel: ch.channel }, remove));
         const row = el("div", { class: "item" }, dragHandle(ch.name),
           el("span", { class: "num", text: String(i + 1) }),
-          el("div", { class: "grow" }, el("div", { class: "title", text: ch.name }),
+          el("div", { class: "grow" }, chanTitle(ch),
             el("div", { class: "sub", text: ch.missing ? "Not in their playlists any more" : ch.source })),
           ...moveButtons(i, channels.length, move), remove);
         list.append(row);
@@ -2320,7 +2519,7 @@
       const all = el("button", { class: "btn small", type: "button", text: "+ All versions", title: "Also adds this channel's HD/FHD/backup versions from every playlist" });
       all.addEventListener("click", () => customAction("customCategoryAdd", { id: cat.id, server: r.server, channel: r.channel, variants: true }, all));
       results.append(el("div", { class: "item" },
-        el("div", { class: "grow" }, el("div", { class: "title", text: r.name }), el("div", { class: "sub", text: r.source })), add, all));
+        el("div", { class: "grow" }, chanTitle(r), el("div", { class: "sub", text: r.source })), add, all));
     }
     if (customEdit.results && !customEdit.results.length) results.append(el("p", { class: "empty", text: "No channels match." }));
     panel.append(el("div", { class: "card" }, el("h3", { text: "Add channels" }), search, results));
