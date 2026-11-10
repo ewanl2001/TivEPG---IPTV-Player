@@ -201,7 +201,7 @@
         4004: everConnected
           ? "Remote Help was stopped on their device."
           : "That number didn't work. Check it with them: it has 6 digits and only works while Remote Help is open on their screen.",
-        4008: "Remote Help ended after 30 minutes. They can start it again for a new number.",
+        4008: "TivEPG Remote timed out. They can start it again for a new number.",
         4010: "They stopped Remote Help.",
         4029: "Too many tries. Wait a minute, then try again.",
       };
