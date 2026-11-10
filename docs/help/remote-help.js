@@ -1386,13 +1386,20 @@
   // What iCloud shares between someone's own devices is copied by default. Device settings
   // (guide size, player, themes, tabs) belong to one screen, so they only copy between the same
   // kind of device, and only when ticked.
-  const copyState = { setup: null, busy: false, error: "", parts: new Set(["categories", "custom", "favourites", "home", "sports"]) };
+  const copyState = { setup: null, busy: false, error: "", playlists: null, sent: false,
+    parts: new Set(["categories", "custom", "favourites", "home", "sports"]) };
+
+  // Same as the app's `RemoteHelpTools.matchKey`: one playlist on two devices.
+  function matchKey(kind, url, username) {
+    let host = (url || "").toLowerCase();
+    try { host = new URL(url).hostname.toLowerCase(); } catch {}
+    return kind === "m3u" ? "m3u|" + (url || "").toLowerCase().trim() : "x|" + host + "|" + (username || "").toLowerCase();
+  }
   const COPY_PARTS = [
-    ["playlists", "Playlists (logins)", "Adds your playlists to their device. Skips ones they already have.", "shared"],
-    ["categories", "TV channel, movie and series categories", "Which are shown, their order and pins. Only for playlists you both have.", "shared"],
-    ["custom", "Custom categories", "Your own categories and their channels. Only channels from playlists you both have.", "shared"],
-    ["favourites", "Favourite channels", "Only for playlists you both have.", "shared"],
-    ["home", "Home screen rows", "The rows and their order.", "shared"],
+    ["categories", "TV channel, movie and series categories", "Which are shown, their order and pins, for the playlists ticked above.", "channels"],
+    ["custom", "Custom categories", "Your own categories, with their channels from the playlists ticked above.", "channels"],
+    ["favourites", "Favourite channels", "From the playlists ticked above.", "channels"],
+    ["home", "Home screen rows", "The rows and their order.", "channels"],
     ["sports", "Sports Hub", "Shown sports and competitions, favourite teams and competitions.", "shared"],
     ["settings", "Device settings", "Guide size, themes, player options and which tabs show.", "device"],
   ];
@@ -1480,38 +1487,72 @@
     const target = (snapshot.device || {}).platform || "device";
     const sameKind = (s.from || "") === target;
     if (!sameKind) copyState.parts.delete("settings");
+
+    // 1. Which playlists. One already on their device only needs ticking to bring its
+    // categories and favourites; a new one is added with its login.
+    const theirs = new Set((snapshot.servers || []).map((x) => matchKey(x.kind, x.url, x.username)));
+    const sources = (s.servers || []).filter((x) => x.m);
+    if (!copyState.playlists) copyState.playlists = new Set(sources.map((x) => x.m));
+    panel.append(el("h4", { class: "hub-section", text: "1 · Which playlists" }));
+    panel.append(el("p", { class: "hint", text: "A playlist's categories and favourites only work with that playlist, so tick the ones to bring across." }));
+    const plCard = el("div", { class: "hub-card" });
+    if (!sources.length) plCard.append(el("p", { class: "empty flat", text: "Your device has no playlists to copy." }));
+    for (const pl of sources) {
+      const have = theirs.has(pl.m);
+      const box = el("input", { type: "checkbox", id: "pl-" + pl.m });
+      box.checked = copyState.playlists.has(pl.m);
+      box.addEventListener("change", () => { box.checked ? copyState.playlists.add(pl.m) : copyState.playlists.delete(pl.m); renderCopy(); });
+      plCard.append(el("label", { class: "hub-row copy-row", for: "pl-" + pl.m }, box,
+        el("div", { class: "grow" },
+          el("div", { class: "title wrap" }, pl.name || "Playlist", el("span", { class: "badge " + (have ? "good" : "off"), text: have ? "On their device" : "New" })),
+          el("div", { class: "sub", text: have ? "Already on their device, nothing to log in to." : `Will be added to their device with your ${pl.kind === "m3u" ? "playlist link" : "login"}.` }))));
+    }
+    panel.append(plCard);
+
+    const anyPlaylist = copyState.playlists.size > 0;
+    const addingNew = sources.some((x) => copyState.playlists.has(x.m) && !theirs.has(x.m));
     const section = (kind, heading, note) => {
       panel.append(el("h4", { class: "hub-section", text: heading }));
       if (note) panel.append(el("p", { class: "hint", text: note }));
       const card = el("div", { class: "hub-card" });
       for (const [id, title, detail, k] of COPY_PARTS) {
         if (k !== kind) continue;
-        const blocked = id === "settings" && !sameKind;
+        const blocked = (id === "settings" && !sameKind) || (k === "channels" && id !== "home" && !anyPlaylist);
         const box = el("input", { type: "checkbox", id: "copy-" + id });
-        box.checked = copyState.parts.has(id);
+        box.checked = copyState.parts.has(id) && !blocked;
         box.disabled = blocked;
         box.addEventListener("change", () => { box.checked ? copyState.parts.add(id) : copyState.parts.delete(id); });
         card.append(el("label", { class: "hub-row copy-row" + (blocked ? " dim" : ""), for: "copy-" + id }, box,
           el("div", { class: "grow" }, el("div", { class: "title wrap", text: title }),
-            el("div", { class: "sub", text: blocked ? `Only copied between the same kind of device. Yours is ${s.from && /^[aeiou]/i.test(s.from) ? "an" : "a"} ${s.from || "different device"}, theirs is ${/^[aeiou]/i.test(target) ? "an" : "a"} ${target}.` : detail }))));
+            el("div", { class: "sub", text: blocked && k === "channels" ? "Tick a playlist above first."
+              : blocked ? `Only copied between the same kind of device. Yours is ${s.from && /^[aeiou]/i.test(s.from) ? "an" : "a"} ${s.from || "different device"}, theirs is ${/^[aeiou]/i.test(target) ? "an" : "a"} ${target}.`
+              : detail }))));
       }
       panel.append(card);
     };
-    section("shared", "Shared between devices", "The same things iCloud keeps in step across someone's own devices.");
-    section("device", `Just this ${target}`, "Sizes and player options suit one screen, so these aren't shared unless you tick them.");
+    section("channels", "2 · What goes with them", addingNew
+      ? "New playlists need to load on their device first. These are copied by themselves once they have."
+      : "For the playlists ticked above.");
+    section("shared", "3 · Also copy", "The same things iCloud keeps in step across someone's own devices.");
+    section("device", `4 · Just this ${target}`, "Sizes and player options suit one screen, so these aren't shared unless you tick them.");
     const apply = el("button", { class: "btn btn-white", type: "button", text: "Copy to their device" });
     apply.addEventListener("click", async () => {
-      if (!copyState.parts.size) return toast("Tick at least one thing to copy.", true);
+      if (!copyState.parts.size && !copyState.playlists.size) return toast("Tick at least one thing to copy.", true);
       if (copyState.parts.has("settings") && !confirm(`This replaces this ${target}'s settings and themes with yours. Carry on?`)) return;
       apply.disabled = true;
       apply.textContent = "Copying…";
-      const r = await command("importSetup", { setup: s, parts: [...copyState.parts] });
+      const parts = [...copyState.parts].filter((p) => p === "home" || p === "sports" || p === "settings" || anyPlaylist);
+      const r = await command("importSetup", { setup: s, parts, playlists: [...copyState.playlists] });
+      copyState.sent = r.ok;
       apply.disabled = false;
       apply.textContent = "Copy to their device";
       toast(r.message || (r.ok ? "Copied." : "Couldn't copy."), !r.ok);
     });
     const restart = el("button", { class: "btn", type: "button", text: "Use a different device" });
-    restart.addEventListener("click", () => { copyState.setup = null; renderCopy(); });
+    restart.addEventListener("click", () => { copyState.setup = null; copyState.playlists = null; copyState.sent = false; renderCopy(); });
+    if (copyState.sent && snapshot.copyFinished) {
+      panel.append(el("div", { class: "banner ok-banner", text: "Finished on their device: " + snapshot.copyFinished }));
+    }
     panel.append(el("div", { class: "row-actions" }, apply, restart));
   }
 
