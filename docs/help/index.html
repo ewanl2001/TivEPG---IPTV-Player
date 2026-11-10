@@ -25,6 +25,16 @@
   <symbol id="i-cloud-off" viewBox="0 0 24 24"><path d="M7 18h10a4 4 0 0 0 .6-7.95A5.5 5.5 0 0 0 7.1 9.1 4.5 4.5 0 0 0 7 18Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M4 4l16 16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
   <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 7.5V12l3 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
   <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-pulse" viewBox="0 0 24 24"><path d="M3 12h4l2.5-6 5 12 2.5-6H21" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M8 6h12M8 12h12M8 18h12" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/><circle cx="4" cy="6" r="1.3" fill="currentColor"/><circle cx="4" cy="12" r="1.3" fill="currentColor"/><circle cx="4" cy="18" r="1.3" fill="currentColor"/></symbol>
+  <symbol id="i-film" viewBox="0 0 24 24"><rect x="3.5" y="4" width="17" height="16" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M7.5 4v16M16.5 4v16M3.5 9h4M3.5 15h4M16.5 9h4M16.5 15h4" stroke="currentColor" stroke-width="1.6"/></symbol>
+  <symbol id="i-stack" viewBox="0 0 24 24"><rect x="3.5" y="8" width="17" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M6 5h12M8.5 2.5h7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M12 11v5M9.5 13.5h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M7 4h10v5a5 5 0 0 1-10 0Z M7 6H4.5a2.5 2.5 0 0 0 2.5 4M17 6h2.5a2.5 2.5 0 0 1-2.5 4M12 14v3M8.5 20h7M10 17h4v3h-4z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+  <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 3.5 2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.9Z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+  <symbol id="i-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  <symbol id="i-remote" viewBox="0 0 24 24"><rect x="7.5" y="2.5" width="9" height="19" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="12" cy="8" r="2" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M10 13.5h4M10 16.5h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+  <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="12" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
 </svg>
 
 <header class="nav">
@@ -107,20 +117,13 @@
     </div>
     <div id="loading-banner" class="banner" hidden></div>
 
-    <nav class="tabs" role="tablist">
-      <button class="tab active" data-tab="health" role="tab">Check-up<span id="health-badge" class="tab-badge" hidden></span></button>
-      <button class="tab" data-tab="playlists" role="tab">Playlists</button>
-      <button class="tab" data-tab="live" role="tab">TV Channels</button>
-      <button class="tab" data-tab="vod" role="tab">Movies</button>
-      <button class="tab" data-tab="series" role="tab">Series</button>
-      <button class="tab" data-tab="sports" role="tab">Sports Hub</button>
-      <button class="tab" data-tab="favourites" role="tab">Favourites &amp; Home</button>
-      <button class="tab" data-tab="settings" role="tab">Settings</button>
-      <button class="tab" data-tab="remote" role="tab">Remote</button>
-      <button class="tab" data-tab="copy" role="tab">Copy Setup</button>
-    </nav>
+    <div id="home-grid" class="home-grid" role="list"></div>
+    <div id="section-bar" class="section-bar" hidden>
+      <button id="back" class="back-btn" type="button" aria-label="Back to all sections">‹ All</button>
+      <h2 id="section-title"></h2>
+    </div>
 
-    <div id="tab-health" class="tab-panel"></div>
+    <div id="tab-health" class="tab-panel" hidden></div>
     <div id="tab-playlists" class="tab-panel" hidden>
       <p class="hint">Their playlists. Fix a login, switch one on or off, or add a new one. After a change their device reloads that playlist by itself.</p>
       <div id="server-list"></div>
@@ -158,6 +161,7 @@
     <div id="tab-vod" class="tab-panel" hidden></div>
     <div id="tab-series" class="tab-panel" hidden></div>
 
+    <div id="tab-custom" class="tab-panel" hidden></div>
     <div id="tab-sports" class="tab-panel" hidden></div>
     <div id="tab-favourites" class="tab-panel" hidden></div>
     <div id="tab-settings" class="tab-panel" hidden></div>

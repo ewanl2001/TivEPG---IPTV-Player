@@ -350,3 +350,69 @@ input:focus, select:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgb
 .copy-row { cursor: pointer; margin: 0; color: var(--text); font-size: 17px; font-weight: 400; }
 .copy-row input { width: 22px; height: 22px; flex: 0 0 auto; accent-color: var(--brand-blue); }
 .ok-banner { background: rgba(70,194,122,.1); border-color: rgba(70,194,122,.35); color: var(--green); margin-bottom: 12px; }
+
+/* ---------- App-style home: cards ---------- */
+.home-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; margin-top: 6px; }
+.home-card {
+  position: relative; display: flex; align-items: center; gap: 14px; min-height: 92px; padding: 16px;
+  text-align: left; border-radius: 20px; border: 1px solid var(--line); cursor: pointer; color: var(--text);
+  background: linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.02)), var(--card);
+  font: inherit; transition: transform .18s var(--ease), border-color .18s var(--ease), background .18s var(--ease);
+}
+.home-card:hover { border-color: var(--line-2); transform: translateY(-2px); }
+.home-card:active { transform: scale(.98); }
+.home-card.alert { border-color: rgba(229,72,77,.55); }
+.home-icon {
+  flex: 0 0 auto; width: 50px; height: 50px; border-radius: 14px; display: grid; place-items: center; color: #fff;
+  box-shadow: 0 10px 24px rgba(0,0,0,.35);
+}
+.home-icon svg { width: 26px; height: 26px; }
+.tint-blue .home-icon { background: linear-gradient(145deg, #2f8bff, #0b4fb8); }
+.tint-red .home-icon { background: linear-gradient(145deg, #ff6b6f, #b4262b); }
+.tint-purple .home-icon { background: linear-gradient(145deg, #a477ff, #5b2fc2); }
+.tint-teal .home-icon { background: linear-gradient(145deg, #34d1bd, #0f7d70); }
+.tint-green .home-icon { background: linear-gradient(145deg, #4cd384, #187a43); }
+.tint-gold .home-icon { background: linear-gradient(145deg, #ffcf5c, #c58a12); }
+.tint-grey .home-icon { background: linear-gradient(145deg, #7c889c, #3d4656); }
+.home-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.home-title { font-weight: 750; font-size: 18px; letter-spacing: -0.01em; }
+.home-sub { color: var(--text-3); font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.home-card.alert .home-sub { color: #ff8a8d; font-weight: 600; }
+.home-badge { position: absolute; top: 10px; right: 12px; min-width: 22px; height: 22px; padding: 0 7px; border-radius: 999px; background: var(--red); color: #fff; font-size: 12px; font-weight: 800; display: grid; place-items: center; }
+.home-chev { color: var(--text-3); font-size: 26px; line-height: 1; }
+
+.section-bar {
+  position: sticky; top: 60px; z-index: 4; display: flex; align-items: center; gap: 12px;
+  margin: 0 -20px; padding: 10px 20px; background: rgba(10,14,21,.85);
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-bottom: 1px solid var(--line);
+}
+.section-bar h2 { font-size: 22px; font-weight: 800; letter-spacing: -0.02em; }
+.back-btn { height: 38px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--line-2); background: transparent; color: var(--blue); font: inherit; font-weight: 700; font-size: 15px; cursor: pointer; }
+.back-btn:hover { background: rgba(95,183,230,.1); }
+
+/* ---------- Collapsible Display Order groups ---------- */
+.order-tools { justify-content: flex-end; margin-bottom: 8px; }
+.group-head {
+  width: 100%; display: flex; align-items: center; gap: 10px; padding: 14px 16px; margin-top: 8px;
+  border-radius: 14px; border: 1px solid var(--line); background: var(--card); color: var(--text);
+  font: inherit; font-weight: 700; font-size: 16px; text-align: left; cursor: pointer;
+}
+.group-head.open { border-color: var(--line-2); background: var(--card-2); }
+.group-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.group-list { margin: 6px 0 4px 10px; }
+
+/* ---------- Custom categories ---------- */
+.check-row { display: flex; align-items: flex-start; gap: 10px; margin-top: 10px; color: var(--text-2); font-weight: 400; font-size: 15px; cursor: pointer; }
+.check-row input { width: 20px; height: 20px; flex: 0 0 auto; margin-top: 2px; accent-color: var(--brand-blue); }
+
+@media (max-width: 560px) {
+  .home-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+  .home-card { flex-direction: column; align-items: flex-start; min-height: 128px; padding: 14px; gap: 10px; }
+  .home-chev { display: none; }
+  .home-title { font-size: 16px; }
+  .home-sub { white-space: normal; font-size: 13px; }
+  .section-bar { top: 60px; }
+  .section-bar h2 { font-size: 19px; }
+}
+.copy-row.dim { opacity: .55; cursor: default; }
+.device-banner { margin-bottom: 12px; }

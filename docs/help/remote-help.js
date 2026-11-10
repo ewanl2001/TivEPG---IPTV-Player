@@ -247,7 +247,7 @@
       if (resolve) { pending.delete(String(msg.req)); resolve(msg); }
     } else if (msg.type === "snapshot") {
       snapshot = msg.snapshot;
-      if ($("screen-help").hidden) show("help");
+      if ($("screen-help").hidden) { show("help"); history.replaceState({ section: null }, ""); showTab(null, false); }
       render();
     }
   }
@@ -291,16 +291,97 @@
   });
 
   // ---------- tabs ----------
-  let currentTab = "health";
-  function showTab(name) {
+  // App-style navigation: a home screen of cards, each opening its own page. The browser's
+  // Back button returns to the cards.
+  let currentTab = null;
+  const SECTIONS = [
+    { id: "health", title: "Check-up", icon: "#i-pulse", tint: "red" },
+    { id: "playlists", title: "Playlists", icon: "#i-list", tint: "blue" },
+    { id: "live", title: "TV Channels", icon: "#i-tv", tint: "blue" },
+    { id: "vod", title: "Movies", icon: "#i-film", tint: "purple" },
+    { id: "series", title: "Series", icon: "#i-stack", tint: "purple" },
+    { id: "custom", title: "Custom Categories", icon: "#i-folder", tint: "teal" },
+    { id: "sports", title: "Sports Hub", icon: "#i-trophy", tint: "green" },
+    { id: "favourites", title: "Favourites & Home", icon: "#i-star", tint: "gold" },
+    { id: "settings", title: "Settings", icon: "#i-gear", tint: "grey" },
+    { id: "remote", title: "Remote", icon: "#i-remote", tint: "blue" },
+    { id: "copy", title: "Copy Setup", icon: "#i-copy", tint: "grey" },
+  ];
+
+  function showTab(name, push = true) {
     currentTab = name;
-    for (const t of document.querySelectorAll(".tab")) {
-      t.classList.toggle("active", t.dataset.tab === name);
-      if (t.dataset.tab === name) t.scrollIntoView({ block: "nearest", inline: "nearest" });
-    }
+    const section = SECTIONS.find((x) => x.id === name);
+    $("home-grid").hidden = !!name;
+    document.querySelector(".device-head").hidden = !!name;
+    $("section-bar").hidden = !name;
+    $("section-title").textContent = section ? section.title : "";
     for (const panel of document.querySelectorAll(".tab-panel")) panel.hidden = panel.id !== "tab-" + name;
+    if (push) history.pushState({ section: name }, "");
+    window.scrollTo({ top: 0 });
+    if (!name) renderHome();
   }
-  for (const tab of document.querySelectorAll(".tab")) tab.addEventListener("click", () => showTab(tab.dataset.tab));
+  $("back").addEventListener("click", () => history.back());
+  window.addEventListener("popstate", (e) => {
+    if ($("screen-help").hidden) return;
+    showTab(e.state && e.state.section ? e.state.section : null, false);
+  });
+
+  function cardSummary(id) {
+    if (!snapshot) return "";
+    const cats = (k) => ((snapshot.categories || {})[k] || []);
+    const shownOf = (k) => `${cats(k).filter((c) => c.shown).length} of ${cats(k).length} shown`;
+    switch (id) {
+      case "health": {
+        const d = healthState.data;
+        if (!d) return healthState.running ? "Checking…" : "Check their setup";
+        if (d.error) return "Couldn't check";
+        return d.problems ? `${d.problems} thing${d.problems === 1 ? "" : "s"} to sort out` : "Everything looks good";
+      }
+      case "playlists": {
+        const list = snapshot.servers || [];
+        const off = list.filter((x) => !x.enabled).length;
+        return list.length ? `${list.length} playlist${list.length === 1 ? "" : "s"}${off ? ` · ${off} off` : ""}` : "None yet: add one";
+      }
+      case "live": case "vod": case "series": return cats(id).length ? shownOf(id) : "Nothing loaded yet";
+      case "custom": {
+        const n = (snapshot.customCategories || []).length;
+        return n ? `${n} categor${n === 1 ? "y" : "ies"}` : "Make your own";
+      }
+      case "sports": return ((snapshot.sports || {}).master || {}).subtitle || "Sports and competitions";
+      case "favourites": {
+        const f = (snapshot.favourites || []).length, r = (snapshot.reminders || []).length;
+        return `${f} favourite channel${f === 1 ? "" : "s"}${r ? ` · ${r} reminder${r === 1 ? "" : "s"}` : ""}`;
+      }
+      case "settings": return "Guide, themes, player";
+      case "remote": { const np = snapshot.nowPlaying || {}; return np.active ? `On now: ${np.name}` : "Nothing playing"; }
+      case "copy": return "Copy your setup to theirs";
+    }
+    return "";
+  }
+
+  function renderHome() {
+    const grid = $("home-grid");
+    grid.replaceChildren(...SECTIONS.map((sec) => {
+      const summary = cardSummary(sec.id);
+      const alert = sec.id === "health" && healthState.data && healthState.data.problems;
+      const card = el("button", { class: "home-card tint-" + sec.tint + (alert ? " alert" : ""), type: "button", role: "listitem" },
+        el("span", { class: "home-icon" }, svgUse(sec.icon)),
+        el("span", { class: "home-text" }, el("span", { class: "home-title", text: sec.title }), el("span", { class: "home-sub", text: summary })),
+        alert ? el("span", { class: "home-badge", text: String(healthState.data.problems) }) : null,
+        el("span", { class: "home-chev", text: "›" }));
+      card.addEventListener("click", () => showTab(sec.id));
+      return card;
+    }));
+  }
+
+  function svgUse(href) {
+    const ns = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(ns, "svg");
+    const use = document.createElementNS(ns, "use");
+    use.setAttribute("href", href);
+    svg.append(use);
+    return svg;
+  }
 
   // ---------- rendering ----------
   function render() {
@@ -330,6 +411,8 @@
     if (!busy("tab-settings") && !Object.values(settingTimers).some(Boolean)) renderSettings();
     if (!busy("tab-remote")) renderRemote();
     if (!busy("tab-copy")) renderCopy();
+    if (!busy("tab-custom")) renderCustom();
+    if (!currentTab) renderHome();
     if (!healthState.requested) runHealthCheck();
     else renderHealth();
   }
@@ -632,10 +715,11 @@
 
   // Display Order, grouped exactly as the app shows it: Pinned, then Custom Categories and each
   // playlist. Things move within their group (that's how the app orders them).
+  const openGroups = new Set();
   function renderDisplayOrder(kind, panel) {
     const all = catsFor(kind);
     const shown = all.filter((c) => c.shown);
-    panel.append(el("p", { class: "hint", text: "Drag ⠿ to reorder within a group, or use ⤒ top / ⤓ bottom · Remove switches it off" }));
+    panel.append(el("p", { class: "hint", text: "Open a group, then drag ⠿ to reorder, or use ⤒ / ⤓ to move to the top or bottom of that group · Remove switches it off" }));
     if (!shown.length) {
       panel.append(el("p", { class: "empty", text: "Nothing is switched on. Pick categories from a playlist above." }));
     }
@@ -659,9 +743,28 @@
     const rank = (g) => g.pinned ? -1 : (deviceOrder.indexOf(g.id) === -1 ? 999 : deviceOrder.indexOf(g.id));
     groups.sort((x, y) => rank(x) - rank(y));
 
+    if (groups.length > 1) {
+      const allOpen = groups.every((g) => openGroups.has(kind + ":" + g.id));
+      const toggleAll = el("button", { class: "btn small", type: "button", text: allOpen ? "Collapse all" : "Expand all" });
+      toggleAll.addEventListener("click", () => {
+        for (const g of groups) allOpen ? openGroups.delete(kind + ":" + g.id) : openGroups.add(kind + ":" + g.id);
+        renderCategories(kind);
+      });
+      panel.append(el("div", { class: "row-actions tight order-tools" }, toggleAll));
+    }
+
     for (const g of groups) {
-      panel.append(el("h4", { class: "hub-section", text: `${g.title} (${g.cats.length})` }));
-      const list = el("div", { class: "list" });
+      // Each group opens and closes; "top" and "bottom" mean the top and bottom of that group.
+      const gk = kind + ":" + g.id;
+      const open = openGroups.has(gk);
+      const head = el("button", { class: "group-head" + (open ? " open" : ""), type: "button", "aria-expanded": open ? "true" : "false" },
+        el("span", { class: "chev" + (open ? " open" : ""), text: "›" }),
+        el("span", { class: "grow group-title", text: g.title }),
+        el("span", { class: "subtab-badge", text: String(g.cats.length) }));
+      head.addEventListener("click", () => { open ? openGroups.delete(gk) : openGroups.add(gk); renderCategories(kind); });
+      panel.append(head);
+      if (!open) continue;
+      const list = el("div", { class: "list group-list" });
       const move = (from, to) => {
         const next = moveIndex(g.cats, from, to);
         if (!g.pinned) {
@@ -725,7 +828,10 @@
     if (source.id === "custom") {
       // Custom categories: switch on/off, or delete ones they no longer want (as the Category
       // Manager on the device does).
-      panel.append(el("p", { class: "hint", text: "Their own categories, made on the device. Delete removes it everywhere, including from their other devices through iCloud." }));
+      const manage = el("button", { class: "btn small btn-white", type: "button", text: "Create or edit custom categories ›" });
+      manage.addEventListener("click", () => showTab("custom"));
+      panel.append(el("div", { class: "row-actions tight" }, manage));
+      panel.append(el("p", { class: "hint", text: "Switch them on or off here. Delete removes one everywhere, including their other devices through iCloud." }));
       const list = el("div", { class: "list" });
       for (const c of source.cats.filter((x) => !q || x.name.toLowerCase().includes(q))) {
         const del = el("button", { class: "btn small danger", type: "button", text: "Delete" });
@@ -1009,9 +1115,7 @@
     again.addEventListener("click", runHealthCheck);
 
     const problems = data && data.problems || 0;
-    const badge = $("health-badge");
-    badge.hidden = !problems;
-    badge.textContent = String(problems);
+    if (!currentTab) renderHome();
 
     let headline = "Checking their setup…";
     if (data && data.error) headline = data.error;
@@ -1157,7 +1261,8 @@
       panel.append(el("p", { class: "empty", text: "Their device needs the latest TivEPG update to change settings from here." }));
       return;
     }
-    panel.append(el("p", { class: "hint", text: "The same options as Settings on their device. Changes apply straight away." }));
+    const platform = (snapshot.device || {}).platform || "device";
+    panel.append(el("div", { class: "banner device-banner", text: `These settings are for their ${platform} only. Their other devices keep their own, as in the app. Changes apply straight away.` }));
     const sections = [];
     for (const s of list) {
       let sec = sections.find((x) => x.name === s.section);
@@ -1278,14 +1383,18 @@
   // ---------- Copy Setup: read your own device, write theirs ----------
   // Your setup lives on your own device, not on a server, so this page connects to it too, for
   // a moment, with its own Remote Help number. Nothing is stored anywhere.
-  const copyState = { setup: null, busy: false, error: "", parts: new Set(["categories", "favourites", "sports", "settings", "home"]) };
+  // What iCloud shares between someone's own devices is copied by default. Device settings
+  // (guide size, player, themes, tabs) belong to one screen, so they only copy between the same
+  // kind of device, and only when ticked.
+  const copyState = { setup: null, busy: false, error: "", parts: new Set(["categories", "custom", "favourites", "home", "sports"]) };
   const COPY_PARTS = [
-    ["playlists", "Playlists (logins)", "Adds your playlists to their device. Skips ones they already have."],
-    ["categories", "TV channel, movie and series categories", "Which are shown, and their order. Only for playlists you both have."],
-    ["favourites", "Favourite channels", "Only for playlists you both have."],
-    ["home", "Home screen rows", "The rows and their order."],
-    ["sports", "Sports Hub", "Shown sports and competitions, favourite teams and competitions."],
-    ["settings", "Settings and themes", "Guide size, themes, player options, which tabs show."],
+    ["playlists", "Playlists (logins)", "Adds your playlists to their device. Skips ones they already have.", "shared"],
+    ["categories", "TV channel, movie and series categories", "Which are shown, their order and pins. Only for playlists you both have.", "shared"],
+    ["custom", "Custom categories", "Your own categories and their channels. Only channels from playlists you both have.", "shared"],
+    ["favourites", "Favourite channels", "Only for playlists you both have.", "shared"],
+    ["home", "Home screen rows", "The rows and their order.", "shared"],
+    ["sports", "Sports Hub", "Shown sports and competitions, favourite teams and competitions.", "shared"],
+    ["settings", "Device settings", "Guide size, themes, player options and which tabs show.", "device"],
   ];
 
   async function fetchSetup(sourceCode) {
@@ -1368,19 +1477,32 @@
     const s = copyState.setup;
     const count = (k) => (s.categories && s.categories[k] || []).length;
     panel.append(el("div", { class: "banner ok-banner", text: `Got your setup from your ${s.from || "device"}: ${(s.servers || []).length} playlist(s), ${count("live") + count("vod") + count("series")} categories, ${(s.favourites || []).length} favourite channels. You can press Stop on your device now.` }));
-    const card = el("div", { class: "hub-card" });
-    for (const [id, title, detail] of COPY_PARTS) {
-      const box = el("input", { type: "checkbox", id: "copy-" + id });
-      box.checked = copyState.parts.has(id);
-      box.addEventListener("change", () => { box.checked ? copyState.parts.add(id) : copyState.parts.delete(id); });
-      card.append(el("label", { class: "hub-row copy-row", for: "copy-" + id }, box,
-        el("div", { class: "grow" }, el("div", { class: "title wrap", text: title }), el("div", { class: "sub", text: detail }))));
-    }
-    panel.append(card);
+    const target = (snapshot.device || {}).platform || "device";
+    const sameKind = (s.from || "") === target;
+    if (!sameKind) copyState.parts.delete("settings");
+    const section = (kind, heading, note) => {
+      panel.append(el("h4", { class: "hub-section", text: heading }));
+      if (note) panel.append(el("p", { class: "hint", text: note }));
+      const card = el("div", { class: "hub-card" });
+      for (const [id, title, detail, k] of COPY_PARTS) {
+        if (k !== kind) continue;
+        const blocked = id === "settings" && !sameKind;
+        const box = el("input", { type: "checkbox", id: "copy-" + id });
+        box.checked = copyState.parts.has(id);
+        box.disabled = blocked;
+        box.addEventListener("change", () => { box.checked ? copyState.parts.add(id) : copyState.parts.delete(id); });
+        card.append(el("label", { class: "hub-row copy-row" + (blocked ? " dim" : ""), for: "copy-" + id }, box,
+          el("div", { class: "grow" }, el("div", { class: "title wrap", text: title }),
+            el("div", { class: "sub", text: blocked ? `Only copied between the same kind of device. Yours is ${s.from && /^[aeiou]/i.test(s.from) ? "an" : "a"} ${s.from || "different device"}, theirs is ${/^[aeiou]/i.test(target) ? "an" : "a"} ${target}.` : detail }))));
+      }
+      panel.append(card);
+    };
+    section("shared", "Shared between devices", "The same things iCloud keeps in step across someone's own devices.");
+    section("device", `Just this ${target}`, "Sizes and player options suit one screen, so these aren't shared unless you tick them.");
     const apply = el("button", { class: "btn btn-white", type: "button", text: "Copy to their device" });
     apply.addEventListener("click", async () => {
       if (!copyState.parts.size) return toast("Tick at least one thing to copy.", true);
-      if (copyState.parts.has("settings") && !confirm("This replaces their settings and themes with yours. Carry on?")) return;
+      if (copyState.parts.has("settings") && !confirm(`This replaces this ${target}'s settings and themes with yours. Carry on?`)) return;
       apply.disabled = true;
       apply.textContent = "Copying…";
       const r = await command("importSetup", { setup: s, parts: [...copyState.parts] });
@@ -1391,6 +1513,140 @@
     const restart = el("button", { class: "btn", type: "button", text: "Use a different device" });
     restart.addEventListener("click", () => { copyState.setup = null; renderCopy(); });
     panel.append(el("div", { class: "row-actions" }, apply, restart));
+  }
+
+  // ---------- Custom Categories (the app's Category Manager) ----------
+  const customEdit = { id: null, channels: null, results: null, query: "" };
+
+  async function openCustomEditor(id) {
+    customEdit.id = id;
+    customEdit.channels = null;
+    customEdit.results = null;
+    renderCustom();
+    const r = await command("customCategoryChannels", { id });
+    if (customEdit.id === id) { customEdit.channels = r.ok ? r.channels : []; renderCustom(); }
+  }
+
+  async function customAction(type, fields, button) {
+    const r = await run(type, fields, button);
+    if (r.ok && r.channels && r.customID === customEdit.id) customEdit.channels = r.channels;
+    renderCustom();
+    return r;
+  }
+
+  function renderCustom() {
+    const panel = $("tab-custom");
+    const keepFocus = document.activeElement && document.activeElement.dataset.customsearch;
+    panel.replaceChildren();
+    const list = snapshot.customCategories;
+    if (!list) {
+      panel.append(el("p", { class: "empty", text: "Their device needs the latest TivEPG update to manage custom categories from here." }));
+      return;
+    }
+
+    const editing = customEdit.id && list.find((c) => c.id === customEdit.id);
+    if (editing) return renderCustomEditor(panel, editing, keepFocus);
+    customEdit.id = null;
+
+    // Create
+    const name = el("input", { placeholder: "e.g. Sports, Kids, News", maxlength: "40", "aria-label": "New category name" });
+    const opt = el("input", { type: "checkbox", id: "new-opt" });
+    const create = el("button", { class: "btn btn-white", type: "button", text: "Create" });
+    const doCreate = async () => {
+      const r = await run("createCustomCategory", { name: name.value, optimised: opt.checked }, create);
+      if (r.ok && r.customID) {
+        snapshot.customCategories = [...list, { id: r.customID, name: name.value.trim(), count: 0, optimised: opt.checked }];
+        openCustomEditor(r.customID);
+      }
+    };
+    create.addEventListener("click", doCreate);
+    name.addEventListener("keydown", (e) => e.key === "Enter" && doCreate());
+    panel.append(el("div", { class: "card" },
+      el("h3", { text: "New custom category" }),
+      el("p", { class: "hint", text: "Pick any channels from any of their playlists and group them under one name. It shows in their TV guide straight away." }),
+      name,
+      el("label", { class: "check-row", for: "new-opt" }, opt, el("span", {}, el("b", { text: "Optimised" }), " · each channel shows once, with its other versions (HD, FHD, backups) tucked under it")),
+      el("div", { class: "row-actions" }, create)));
+
+    // Existing
+    panel.append(el("h4", { class: "hub-section", text: `Their custom categories (${list.length})` }));
+    const rows = el("div", { class: "list" });
+    if (!list.length) rows.append(el("p", { class: "empty", text: "None yet." }));
+    for (const c of list) {
+      const edit = el("button", { class: "btn small", type: "button", text: "Edit" });
+      edit.addEventListener("click", () => openCustomEditor(c.id));
+      const del = el("button", { class: "btn small danger", type: "button", text: "Delete" });
+      del.addEventListener("click", () => {
+        if (confirm(`Delete "${c.name}" from their device? This can't be undone.`)) run("deleteCustomCategory", { id: c.id }, del);
+      });
+      rows.append(el("div", { class: "item" },
+        el("div", { class: "grow" }, el("div", { class: "title", text: c.name }),
+          el("div", { class: "sub", text: `${c.count} channel${c.count === 1 ? "" : "s"}${c.optimised ? " · Optimised" : ""}` })),
+        edit, del));
+    }
+    panel.append(rows);
+  }
+
+  function renderCustomEditor(panel, cat, keepFocus) {
+    const done = el("button", { class: "btn small", type: "button", text: "‹ All custom categories" });
+    done.addEventListener("click", () => { customEdit.id = null; renderCustom(); });
+    panel.append(el("div", { class: "row-actions tight" }, done));
+
+    const name = el("input", { value: cat.name, maxlength: "40", "aria-label": "Category name" });
+    const save = el("button", { class: "btn", type: "button", text: "Rename" });
+    save.addEventListener("click", async () => {
+      const r = await customAction("renameCustomCategory", { id: cat.id, name: name.value }, save);
+      if (r.ok) cat.name = name.value.trim();
+    });
+    panel.append(el("div", { class: "card" }, el("h3", { text: cat.name }), el("div", { class: "pass-wrap" }, name, save)));
+
+    // Channels in it
+    const channels = customEdit.channels;
+    panel.append(el("h4", { class: "hub-section", text: channels ? `Channels (${channels.length})` : "Channels" }));
+    const list = el("div", { class: "list" });
+    if (!channels) list.append(el("p", { class: "empty", text: "Loading…" }));
+    else if (!channels.length) list.append(el("p", { class: "empty", text: "No channels yet. Search below to add some." }));
+    else {
+      const move = (from, to) => {
+        customEdit.channels = moveIndex(channels, from, to);
+        renderCustom();
+        customAction("customCategoryOrder", { id: cat.id, keys: customEdit.channels.map((c) => c.key) });
+      };
+      const rows = channels.map((ch, i) => {
+        const remove = el("button", { class: "btn small danger", type: "button", text: "Remove" });
+        remove.addEventListener("click", () => customAction("customCategoryRemove", { id: cat.id, server: ch.server, channel: ch.channel }, remove));
+        const row = el("div", { class: "item" }, dragHandle(ch.name),
+          el("span", { class: "num", text: String(i + 1) }),
+          el("div", { class: "grow" }, el("div", { class: "title", text: ch.name }),
+            el("div", { class: "sub", text: ch.missing ? "Not in their playlists any more" : ch.source })),
+          ...moveButtons(i, channels.length, move), remove);
+        list.append(row);
+        return row;
+      });
+      sortable(rows, move);
+    }
+    panel.append(list);
+
+    // Add channels
+    const search = channelSearchBox("Search their channels to add, e.g. Sky Sports", (results) => { customEdit.results = results; renderCustom(); });
+    search.dataset.customsearch = "1";
+    search.value = keepFocus ? customEdit.query : "";
+    search.addEventListener("input", () => { customEdit.query = search.value; });
+    const results = el("div", { class: "list" });
+    const inCat = new Set((channels || []).map((c) => c.key));
+    for (const r of customEdit.results || []) {
+      const key = r.server + "|" + r.channel;
+      const add = el("button", { class: "btn small btn-white", type: "button", text: inCat.has(key) ? "Added" : "+ Add" });
+      add.disabled = inCat.has(key);
+      add.addEventListener("click", () => customAction("customCategoryAdd", { id: cat.id, server: r.server, channel: r.channel }, add));
+      const all = el("button", { class: "btn small", type: "button", text: "+ All versions", title: "Also adds this channel's HD/FHD/backup versions from every playlist" });
+      all.addEventListener("click", () => customAction("customCategoryAdd", { id: cat.id, server: r.server, channel: r.channel, variants: true }, all));
+      results.append(el("div", { class: "item" },
+        el("div", { class: "grow" }, el("div", { class: "title", text: r.name }), el("div", { class: "sub", text: r.source })), add, all));
+    }
+    if (customEdit.results && !customEdit.results.length) results.append(el("p", { class: "empty", text: "No channels match." }));
+    panel.append(el("div", { class: "card" }, el("h3", { text: "Add channels" }), search, results));
+    if (keepFocus) { search.focus(); search.setSelectionRange(search.value.length, search.value.length); }
   }
 
   // ---------- start ----------
