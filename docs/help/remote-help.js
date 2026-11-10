@@ -1568,7 +1568,9 @@
     remote.timer = ms ? setInterval(() => { if (currentTab === "remote" && !document.hidden) fn(); }, ms) : null;
   }
 
-  async function remoteMode(mode) {
+  async function remoteMode(mode, fromBar = false) {
+    // Leaving the match centre from the app bar: close it, or it stays drawn over every tab.
+    if (fromBar && mc.open) { mc.open = false; clearTimeout(mc.timer); document.body.classList.remove("mc-open"); }
     remote.mode = mode;
     navPush();
     remoteRefreshEvery(0);
@@ -1751,11 +1753,11 @@
     renderNowPlaying(ensureDock());
 
     const modes = el("div", { class: "remote-modes", role: "tablist" },
-      pill("📺 Guide", null, remote.mode === "guide", () => remoteMode("guide")),
-      pill("🏆 Sports Hub", null, remote.mode === "sports", () => remoteMode("sports")),
-      tabOn("Movies") ? pill("🎬 Movies", null, remote.mode === "vod", () => remoteMode("vod")) : null,
-      tabOn("Series") ? pill("🎞️ Series", null, remote.mode === "series", () => remoteMode("series")) : null,
-      pill("Tabs", null, remote.mode === "goto", () => remoteMode("goto")));
+      pill("📺 Guide", null, remote.mode === "guide", () => remoteMode("guide", true)),
+      pill("🏆 Sports Hub", null, remote.mode === "sports", () => remoteMode("sports", true)),
+      tabOn("Movies") ? pill("🎬 Movies", null, remote.mode === "vod", () => remoteMode("vod", true)) : null,
+      tabOn("Series") ? pill("🎞️ Series", null, remote.mode === "series", () => remoteMode("series", true)) : null,
+      pill("Tabs", null, remote.mode === "goto", () => remoteMode("goto", true)));
     const scrollX = ($("remote-bar").firstChild || {}).scrollLeft || 0;
     $("remote-bar").replaceChildren(modes);
     modes.scrollLeft = scrollX;
@@ -3325,7 +3327,7 @@
     if (tv && hasTable) {
       body.append(el("aside", { class: "hub-side" },
         el("div", { class: "hub-side-head", text: /basketball|baseball|american|hockey/i.test(dest.sport || "") ? "Standings" : "Table" }),
-        hubTableEl(sp.table, true)));
+        hubTableEl(sp.table, window.innerWidth < 1300)));
     }
 
     if (sp.view === "table" && !tv && dest.code !== "UPCOMING") {

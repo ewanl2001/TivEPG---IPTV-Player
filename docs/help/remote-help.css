@@ -1318,3 +1318,8 @@ body.mc-open #tab-remote { width: 100%; max-width: 1240px; margin: 0 auto; }
   .mc-hl-sources .hl-src { display: grid; grid-template-columns: 1fr auto auto; gap: 6px; align-items: center; }
   .mc-hl-sources .hl-src-label { font-size: 13px; }
 }
+
+/* League view: the table gets a real share of a wide screen (W/D/L shown from 1300px). */
+.hub-body.with-table { grid-template-columns: minmax(0, 1fr) clamp(340px, 38%, 640px) !important; }
+.hub-body.with-table .hub-list { max-width: none; }
+.hub-side .hub-table td.team { max-width: none; }
