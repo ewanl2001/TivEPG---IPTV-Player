@@ -317,6 +317,8 @@
     $("section-title").textContent = section ? section.title : "";
     for (const panel of document.querySelectorAll(".tab-panel")) panel.hidden = panel.id !== "tab-" + name;
     if (push) history.pushState({ section: name }, "");
+    if (name === "remote") remoteMode(remote.mode === "goto" ? "goto" : remote.mode);
+    else if (typeof remoteRefreshEvery === "function") remoteRefreshEvery(0);
     window.scrollTo({ top: 0 });
     if (!name) renderHome();
   }
@@ -1339,14 +1341,128 @@
     return el("div", { class: "hub-row setting-wide" }, label, el("div", { class: "stepper" }, minus, out, plus, range));
   }
 
-  // ---------- Remote: what's on, go to a tab, put a channel on ----------
-  let remoteResults = null;
-  const TABS = [["Home", "Home"], ["Guide", "Guide"], ["Sports Hub", "Sports Hub"], ["Movies", "Movies"], ["Series", "Series"], ["Settings", "Settings"]];
+  // ---------- Remote: browse their guide and Sports Hub, and put things on their screen ----------
+  // Picking Guide or Sports Hub switches their device to it too, and choosing a guide category
+  // moves their guide to it, so you're both looking at the same thing.
+  const remote = {
+    mode: "guide",
+    guide: { groups: null, open: new Set(["pinned"]), category: null, channels: null, filter: "" },
+    sports: { group: null, item: null, events: null, event: null, channels: null },
+    timer: null,
+  };
+  const timeText = (t) => new Date(t * 1000).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  const dayText = (t) => {
+    const d = new Date(t * 1000), today = new Date();
+    const diff = Math.round((new Date(d.toDateString()) - new Date(today.toDateString())) / 86400000);
+    return diff === 0 ? "Today" : diff === 1 ? "Tomorrow" : d.toLocaleDateString(undefined, { weekday: "long", day: "numeric", month: "short" });
+  };
+
+  function remoteRefreshEvery(ms, fn) {
+    clearInterval(remote.timer);
+    remote.timer = ms ? setInterval(() => { if (currentTab === "remote" && !document.hidden) fn(); }, ms) : null;
+  }
+
+  async function remoteMode(mode) {
+    remote.mode = mode;
+    remoteRefreshEvery(0);
+    if (mode === "guide") {
+      command("goTo", { tab: "Guide" });
+      if (remote.guide.category) openGuideCategory(remote.guide.category, false);
+      else loadGuideGroups();
+    } else if (mode === "sports") {
+      command("goTo", { tab: "Sports Hub" });
+      if (remote.sports.item) openSportsItem(remote.sports.item);
+    }
+    renderRemote();
+  }
+
+  async function loadGuideGroups() {
+    const r = await command("guideCategories", {});
+    remote.guide.groups = r.ok ? r.groups : [];
+    renderRemote();
+  }
+
+  async function openGuideCategory(cat, follow = true) {
+    remote.guide.category = cat;
+    if (follow) remote.guide.channels = null;
+    renderRemote();
+    const load = async (followTV) => {
+      const r = await command("guideChannels", { key: cat.key, follow: followTV });
+      if (remote.guide.category && remote.guide.category.key === cat.key) {
+        remote.guide.channels = r.ok ? r.channels : [];
+        if (!busy("tab-remote")) renderRemote();
+      }
+    };
+    await load(follow);
+    remoteRefreshEvery(60000, () => load(false));
+  }
+
+  async function openSportsItem(item) {
+    remote.sports.item = item;
+    remote.sports.event = null;
+    remote.sports.channels = null;
+    if (!remote.sports.events || remote.sports.events.code !== item.code + "|" + (item.competition || "")) remote.sports.events = null;
+    renderRemote();
+    const load = async () => {
+      const r = await command("hubEvents", { code: item.code, competition: item.competition });
+      if (remote.sports.item === item) {
+        remote.sports.events = { code: item.code + "|" + (item.competition || ""), list: r.ok ? r.events : [] };
+        if (!busy("tab-remote")) renderRemote();
+      }
+    };
+    await load();
+    remoteRefreshEvery(45000, load);
+  }
+
+  async function openSportsEvent(ev) {
+    remote.sports.event = ev;
+    remote.sports.channels = null;
+    renderRemote();
+    const r = await command("hubEventChannels", { code: remote.sports.item.code, fixture: ev.id });
+    if (remote.sports.event === ev) { remote.sports.channels = r.ok ? r.channels : []; renderRemote(); }
+  }
+
+  function busy(id) {
+    const a = document.activeElement;
+    return a && $(id).contains(a) && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName);
+  }
+
+  function crumb(parts) {
+    // parts: [label, onClick|null]...
+    return el("div", { class: "crumbs" }, parts.map(([label, go], i) => {
+      if (!go) return el("span", { class: "crumb current", text: label });
+      const b = el("button", { class: "crumb", type: "button", text: (i === 0 ? "‹ " : "") + label });
+      b.addEventListener("click", go);
+      return b;
+    }));
+  }
+
+  function channelRow(c, extra) {
+    const watch = el("button", { class: "btn small btn-white", type: "button", text: "▶ Watch" });
+    watch.addEventListener("click", () => run("playChannel", { server: c.server, channel: c.channel, ...(extra || {}) }, watch));
+    let progress = null;
+    if (c.nowStart && c.nowEnd) {
+      const pct = Math.max(0, Math.min(100, ((Date.now() / 1000 - c.nowStart) / (c.nowEnd - c.nowStart)) * 100));
+      const bar = el("span", { class: "prog-fill" });
+      bar.style.width = pct + "%";
+      progress = el("span", { class: "prog" }, bar);
+    }
+    return el("div", { class: "item chan" },
+      el("div", { class: "grow" },
+        el("div", { class: "title", text: c.name }),
+        c.now ? el("div", { class: "now-line" }, el("span", { class: "now-title", text: c.now }),
+          c.nowEnd ? el("span", { class: "sub", text: ` · until ${timeText(c.nowEnd)}` }) : null) : el("div", { class: "sub", text: c.source || "No guide information" }),
+        progress,
+        c.next ? el("div", { class: "sub", text: `Next: ${c.next} · ${timeText(c.nextStart)}` }) : null),
+      watch);
+  }
+
   function renderRemote() {
     const panel = $("tab-remote");
-    const keepFocus = document.activeElement && document.activeElement.dataset.remotesearch;
-    const typed = keepFocus ? document.activeElement.value : "";
+    const keepFocus = document.activeElement && document.activeElement.dataset.remotefilter;
     panel.replaceChildren();
+
+    // On their screen now
     const np = snapshot.nowPlaying || {};
     const stop = el("button", { class: "btn small danger", type: "button", text: "Stop" });
     stop.addEventListener("click", () => run("stopPlayback", {}, stop));
@@ -1356,28 +1472,159 @@
         el("div", { class: "grow title-lg", text: np.active ? np.name : "Nothing playing" }),
         np.active ? stop : null)));
 
-    panel.append(el("h4", { class: "hub-section", text: "Go to" }));
-    panel.append(el("div", { class: "row-actions" }, TABS.map(([tab, label]) => {
-      const b = el("button", { class: "btn", type: "button", text: label });
-      b.addEventListener("click", () => run("goTo", { tab }, b));
-      return b;
-    })));
+    const modes = el("div", { class: "subtabs remote-modes" },
+      pill("📺 Guide", null, remote.mode === "guide", () => remoteMode("guide")),
+      pill("🏆 Sports Hub", null, remote.mode === "sports", () => remoteMode("sports")),
+      pill("Go to…", null, remote.mode === "goto", () => remoteMode("goto")));
+    panel.append(modes);
 
-    panel.append(el("h4", { class: "hub-section", text: "Put a channel on" }));
-    const search = channelSearchBox("Type a channel name, e.g. BBC One", (results) => { remoteResults = results; renderRemote(); });
-    search.dataset.remotesearch = "1";
-    search.value = typed;
-    panel.append(search);
-    const results = el("div", { class: "list" });
-    for (const c of remoteResults || []) {
-      const watch = el("button", { class: "btn small btn-white", type: "button", text: "▶ Watch" });
-      watch.addEventListener("click", () => run("playChannel", { server: c.server, channel: c.channel }, watch));
-      results.append(el("div", { class: "item" }, el("div", { class: "grow" }, el("div", { class: "title", text: c.name }), el("div", { class: "sub", text: c.source })), watch));
+    if (remote.mode === "goto") {
+      panel.append(el("p", { class: "hint", text: "Opens that part of the app on their screen." }));
+      panel.append(el("div", { class: "row-actions" }, [["Home", "Home"], ["Guide", "Guide"], ["Sports Hub", "Sports Hub"], ["Movies", "Movies"], ["Series", "Series"], ["Settings", "Settings"]].map(([tab, label]) => {
+        const b = el("button", { class: "btn", type: "button", text: label });
+        b.addEventListener("click", () => run("goTo", { tab }, b));
+        return b;
+      })));
+      return;
     }
-    if (remoteResults && !remoteResults.length) results.append(el("p", { class: "empty", text: "No channels match." }));
-    panel.append(results);
-    panel.append(el("p", { class: "hint", text: "The channel starts full screen on their device straight away." }));
-    if (keepFocus) { search.focus(); search.setSelectionRange(search.value.length, search.value.length); }
+
+    if (remote.mode === "guide") renderRemoteGuide(panel);
+    else renderRemoteSports(panel);
+
+    if (keepFocus) {
+      const f = panel.querySelector("input[data-remotefilter]");
+      if (f) { f.focus(); f.setSelectionRange(f.value.length, f.value.length); }
+    }
+  }
+
+  function filterBox(placeholder) {
+    const f = el("input", { class: "search", placeholder, value: remote.guide.filter });
+    f.dataset.remotefilter = "1";
+    f.addEventListener("input", () => { remote.guide.filter = f.value; renderRemote(); });
+    return f;
+  }
+
+  function renderRemoteGuide(panel) {
+    const g = remote.guide;
+    if (!g.category) {
+      if (!g.groups) { panel.append(el("p", { class: "empty", text: "Loading their guide…" })); if (g.groups === null) loadGuideGroups(); g.groups = g.groups || undefined; return; }
+      panel.append(el("p", { class: "hint", text: "Their guide's categories, in the same order. Pick one and their guide moves to it." }));
+      panel.append(filterBox("Find a category"));
+      const q = g.filter.trim().toLowerCase();
+      if (!g.groups.length) panel.append(el("p", { class: "empty", text: "No TV channel categories are switched on." }));
+      for (const grp of g.groups) {
+        const items = grp.items.filter((c) => !q || c.name.toLowerCase().includes(q));
+        if (q && !items.length) continue;
+        const open = q || g.open.has(grp.id);
+        const head = el("button", { class: "group-head" + (open ? " open" : ""), type: "button" },
+          el("span", { class: "chev" + (open ? " open" : ""), text: "›" }),
+          el("span", { class: "grow group-title", text: grp.title }),
+          el("span", { class: "subtab-badge", text: String(items.length) }));
+        head.addEventListener("click", () => { g.open.has(grp.id) ? g.open.delete(grp.id) : g.open.add(grp.id); renderRemote(); });
+        panel.append(head);
+        if (!open) continue;
+        const list = el("div", { class: "list group-list" });
+        for (const c of items) {
+          const row = el("button", { class: "item cat-row", type: "button" }, el("span", { class: "grow title", text: c.name }), el("span", { class: "chev", text: "›" }));
+          row.addEventListener("click", () => { g.filter = ""; openGuideCategory(c); });
+          list.append(row);
+        }
+        panel.append(list);
+      }
+      return;
+    }
+
+    panel.append(crumb([["Categories", () => { g.category = null; g.channels = null; remoteRefreshEvery(0); renderRemote(); }], [g.category.name, null]]));
+    if (!g.channels) { panel.append(el("p", { class: "empty", text: "Loading channels and what's on…" })); return; }
+    panel.append(filterBox("Find a channel or programme"));
+    const q = g.filter.trim().toLowerCase();
+    const list = el("div", { class: "list" });
+    const rows = g.channels.filter((c) => !q || c.name.toLowerCase().includes(q) || (c.now || "").toLowerCase().includes(q));
+    if (!rows.length) list.append(el("p", { class: "empty", text: q ? "Nothing matches." : "No channels in this category." }));
+    for (const c of rows) list.append(channelRow(c));
+    panel.append(list);
+  }
+
+  function renderRemoteSports(panel) {
+    const sp = remote.sports;
+    const sports = snapshot.sports || {};
+    const groups = sports.groups || [];
+    if (!groups.length) { panel.append(el("p", { class: "empty", text: "Their Sports Hub hasn't loaded yet." })); return; }
+
+    // 1. Sport
+    if (!sp.group) {
+      panel.append(el("p", { class: "hint", text: "Pick a sport, then a competition, then the match." }));
+      const list = el("div", { class: "list" });
+      for (const g of groups) {
+        const row = el("button", { class: "item cat-row", type: "button" },
+          el("div", { class: "grow" }, el("div", { class: "title", text: g.name }), el("div", { class: "sub", text: g.subtitle })),
+          el("span", { class: "chev", text: "›" }));
+        row.addEventListener("click", () => { sp.group = g.id; renderRemote(); });
+        list.append(row);
+      }
+      panel.append(list);
+      return;
+    }
+    const group = groups.find((g) => g.id === sp.group);
+    if (!group) { sp.group = null; return renderRemote(); }
+    const back = () => { sp.group = null; sp.item = null; sp.events = null; remoteRefreshEvery(0); renderRemote(); };
+
+    // 2. Competition (a tab with several competitions lists them)
+    if (!sp.item) {
+      panel.append(crumb([["Sports", back], [group.name, null]]));
+      const items = [];
+      for (const it of group.items) {
+        if (it.competitions) for (const c of it.competitions) items.push({ code: c.code, competition: c.name, name: c.name });
+        else items.push({ code: it.code, competition: it.kind === "competition" ? it.name : undefined, name: it.name });
+      }
+      const list = el("div", { class: "list" });
+      for (const it of items) {
+        const row = el("button", { class: "item cat-row", type: "button" }, el("span", { class: "grow title", text: it.name }), el("span", { class: "chev", text: "›" }));
+        row.addEventListener("click", () => openSportsItem(it));
+        list.append(row);
+      }
+      panel.append(list);
+      return;
+    }
+
+    // 3. Events
+    if (!sp.event) {
+      panel.append(crumb([["Sports", back], [group.name, () => { sp.item = null; sp.events = null; remoteRefreshEvery(0); renderRemote(); }], [sp.item.name, null]]));
+      if (!sp.events) { panel.append(el("p", { class: "empty", text: "Loading matches…" })); return; }
+      const evs = sp.events.list;
+      if (!evs.length) { panel.append(el("p", { class: "empty", text: "No matches in the next week." })); return; }
+      let lastHead = "";
+      const list = el("div", { class: "list" });
+      for (const ev of evs) {
+        const head = ev.state === "live" ? "Live now" : ev.state === "finished" ? "Results" : dayText(ev.kickoff);
+        if (head !== lastHead) { list.append(el("h4", { class: "hub-section" + (head === "Live now" ? " live-head" : ""), text: head })); lastHead = head; }
+        const right = ev.state === "upcoming" ? timeText(ev.kickoff) : `${ev.score || ""} ${ev.state === "live" ? (ev.status === "LIVE" ? "" : ev.status) : "FT"}`.trim();
+        const row = el("button", { class: "item cat-row event-row" + (ev.state === "live" ? " live" : ""), type: "button" },
+          el("div", { class: "grow" },
+            el("div", { class: "title", text: `${ev.home} v ${ev.away}` }),
+            group.items.length > 1 || sp.item.competition ? null : el("div", { class: "sub", text: ev.league })),
+          ev.state === "live" ? el("span", { class: "live-dot", text: "LIVE" }) : null,
+          el("span", { class: "event-right", text: right }),
+          el("span", { class: "chev", text: "›" }));
+        row.addEventListener("click", () => openSportsEvent(ev));
+        list.append(row);
+      }
+      panel.append(list);
+      return;
+    }
+
+    // 4. Channels for the match
+    const ev = sp.event;
+    panel.append(crumb([["Sports", back], [sp.item.name, () => { sp.event = null; sp.channels = null; renderRemote(); }], [`${ev.home} v ${ev.away}`, null]]));
+    panel.append(el("div", { class: "card event-card" },
+      el("div", { class: "title-lg", text: `${ev.home} v ${ev.away}` }),
+      el("div", { class: "sub", text: ev.state === "upcoming" ? `${dayText(ev.kickoff)} · ${timeText(ev.kickoff)}` : `${ev.score || ""} · ${ev.state === "live" ? "Live now" : "Finished"}` })));
+    if (!sp.channels) { panel.append(el("p", { class: "empty", text: "Finding the channels showing it…" })); return; }
+    if (!sp.channels.length) { panel.append(el("p", { class: "empty", text: "None of their channels are showing this one." })); return; }
+    panel.append(el("p", { class: "hint", text: "Best match first, the same list as Watch in their Sports Hub." }));
+    const list = el("div", { class: "list" });
+    for (const c of sp.channels) list.append(channelRow(c, { fixture: ev.id, code: sp.item.code }));
+    panel.append(list);
   }
 
   // ---------- Copy Setup: read your own device, write theirs ----------

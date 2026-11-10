@@ -416,3 +416,23 @@ input:focus, select:focus { border-color: var(--blue); box-shadow: 0 0 0 3px rgb
 }
 .copy-row.dim { opacity: .55; cursor: default; }
 .device-banner { margin-bottom: 12px; }
+
+/* ---------- Phone remote: guide and Sports Hub browsers ---------- */
+.remote-modes { margin-top: 14px; }
+.crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 6px 0 12px; }
+.crumb { border: 0; background: rgba(255,255,255,.06); color: var(--blue); font: inherit; font-weight: 650; font-size: 14px; padding: 6px 12px; border-radius: 999px; cursor: pointer; }
+.crumb.current { background: transparent; color: var(--text); cursor: default; padding-left: 4px; }
+.crumb + .crumb::before, .crumb + .crumb.current::before { content: ""; }
+button.item.cat-row { width: 100%; text-align: left; font: inherit; color: var(--text); cursor: pointer; }
+button.item.cat-row:hover { border-color: var(--line-2); background: var(--card-2); }
+.item.chan { align-items: flex-start; padding: 12px; }
+.item.chan .btn { margin-top: 2px; }
+.now-line { font-size: 14px; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.now-title { color: var(--text); font-weight: 600; }
+.prog { display: block; height: 4px; border-radius: 4px; background: rgba(255,255,255,.1); margin: 6px 0 4px; overflow: hidden; max-width: 320px; }
+.prog-fill { display: block; height: 100%; background: var(--brand-blue); }
+.event-row .event-right { color: var(--text-2); font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.event-row.live { border-color: rgba(229,72,77,.45); }
+.live-dot { font-size: 11px; font-weight: 800; letter-spacing: .06em; color: #fff; background: var(--red); padding: 3px 7px; border-radius: 6px; }
+.live-head { color: #ff8a8d; }
+.event-card { margin: 0 0 12px; }
