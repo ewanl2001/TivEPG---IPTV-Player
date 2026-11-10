@@ -304,7 +304,8 @@
     { id: "sports", title: "Sports Hub", icon: "#i-trophy", tint: "green" },
     { id: "favourites", title: "Favourites & Home", icon: "#i-star", tint: "gold" },
     { id: "settings", title: "Settings", icon: "#i-gear", tint: "grey" },
-    { id: "remote", title: "Remote", icon: "#i-remote", tint: "blue" },
+    { id: "remote", title: "TivEPG Remote", icon: "#i-remote", tint: "blue" },
+    { id: "selection", title: "Category & Sport Selection", icon: "#i-stack", tint: "purple" },
     { id: "copy", title: "Copy Setup", icon: "#i-copy", tint: "grey" },
   ];
 
@@ -321,6 +322,7 @@
     else if (typeof remoteRefreshEvery === "function") { remoteRefreshEvery(0); startPlayerPoll(false); }
     window.scrollTo({ top: 0 });
     if (!name) renderHome();
+    if (name === "selection") renderSelection();
   }
   $("back").addEventListener("click", () => history.back());
   window.addEventListener("popstate", (e) => {
@@ -355,27 +357,40 @@
         return `${f} favourite channel${f === 1 ? "" : "s"}${r ? ` · ${r} reminder${r === 1 ? "" : "s"}` : ""}`;
       }
       case "settings": return "Guide, themes, player";
-      case "remote": { const np = snapshot.nowPlaying || {}; return np.active ? `On now: ${np.name}` : "Nothing playing"; }
+      case "remote": { const np = snapshot.nowPlaying || {}; return np.active ? `On now: ${np.name}` : "Guide, Sports Hub, Movies, Series"; }
+      case "selection": return "TV, Movies, Series, Sports Hub";
       case "copy": return "Copy your setup to theirs";
     }
     return "";
   }
 
-  function renderHome() {
-    const grid = $("home-grid");
-    grid.replaceChildren(...SECTIONS.map((sec) => {
+  // The home screen (simplified 10 Nov 2026): the check-up (it flags problems), then four
+  // places. Categories, Sports Hub, custom categories and favourites live one level down under
+  // "Category & Sport Selection"; Copy Setup is on the Playlists page.
+  const HOME = ["health", "playlists", "selection", "settings", "remote"];
+  const SELECTION = ["live", "vod", "series", "sports", "custom", "favourites"];
+  function sectionCard(sec) {
       const summary = cardSummary(sec.id);
       const alert = sec.id === "health" && healthState.data && healthState.data.problems;
-      const card = el("button", { class: "home-card tint-" + sec.tint + (alert ? " alert" : ""), type: "button", role: "listitem" },
+      const card = el("button", { class: "home-card tint-" + sec.tint + (alert ? " alert" : "") + (sec.id === "health" ? " home-wide" : ""), type: "button", role: "listitem" },
         el("span", { class: "home-icon" }, svgUse(sec.icon)),
         el("span", { class: "home-text" }, el("span", { class: "home-title", text: sec.title }), el("span", { class: "home-sub", text: summary })),
         alert ? el("span", { class: "home-badge", text: String(healthState.data.problems) }) : null,
         el("span", { class: "home-chev", text: "›" }));
       card.addEventListener("click", () => showTab(sec.id));
       return card;
-    }));
   }
-
+  function renderSelection() {
+    const panel = $("tab-selection");
+    panel.replaceChildren(
+      el("p", { class: "hint", text: "What shows on their TV: channel, film and series categories, the Sports Hub, their own categories and favourites." }),
+      el("div", { class: "home-grid", role: "list" }, SELECTION.map((id) => sectionCard(SECTIONS.find((x) => x.id === id)))));
+  }
+  function renderHome() {
+    const grid = $("home-grid");
+    grid.replaceChildren(...HOME.map((id) => sectionCard(SECTIONS.find((x) => x.id === id))));
+    if (currentTab === "selection") renderSelection();
+  }
   function svgUse(href) {
     const ns = "http://www.w3.org/2000/svg";
     const svg = document.createElementNS(ns, "svg");
@@ -398,6 +413,7 @@
     $("loading-banner").textContent = "Their TV is loading: " + (loading.message || "playlists and guide") + ". Lists below update when it finishes.";
 
     renderServers();
+    renderPlaylistTools();
     for (const kind of ["live", "vod", "series"]) {
       // A pending local edit wins over the snapshot until it's been sent.
       if (!catTimers[kind]) localCats[kind] = null;
@@ -414,7 +430,7 @@
     if (!busy("tab-remote")) renderRemote();
     if (!busy("tab-copy")) renderCopy();
     if (!busy("tab-custom")) renderCustom();
-    if (!currentTab) renderHome();
+    if (!currentTab || currentTab === "selection") renderHome();
     if (!healthState.requested) runHealthCheck();
     else renderHealth();
   }
@@ -422,6 +438,62 @@
   // Playlists
   const openEditors = new Set();
   const editorCache = new Map();
+
+  // Playlists page tools (10 Nov 2026), to troubleshoot from afar: the app's Playlist
+  // Auto-Refresh picker, and the TV guide - when each playlist's guide last came in, Fetch
+  // (Settings > TV Guide > Fetch) and Clear (wipes it; Fetch rebuilds). Copy Setup lives here too.
+  function renderPlaylistTools() {
+    const box = $("playlist-tools");
+    const t = snapshot.playlistTools;
+    box.replaceChildren();
+    if (!t) return;                                         // an older app
+    const ago = (sec) => {
+      const m = Math.round((Date.now() / 1000 - sec) / 60);
+      return m < 2 ? "just now" : m < 60 ? `${m} min ago` : m < 48 * 60 ? `${Math.round(m / 60)} h ago` : `${Math.round(m / 1440)} days ago`;
+    };
+    const when = (sec) => { const h = Math.round((sec - Date.now() / 1000) / 3600); return h <= 0 ? "soon" : h < 48 ? `in about ${h} h` : `in ${Math.round(h / 24)} days`; };
+
+    // Auto-refresh
+    const pick = el("select", { "aria-label": "How often their playlists refresh" },
+      (t.refreshOptions || []).map((o) => { const op = el("option", { value: o, text: o }); op.selected = o === t.refresh; return op; }));
+    pick.addEventListener("change", () => run("setPlaylistRefresh", { value: pick.value }, pick));
+    const refreshSub = /manual/i.test(t.refresh || "") ? "They only refresh when reloaded by hand."
+      : [t.lastRefresh ? `Last refreshed ${ago(t.lastRefresh)}` : null, t.nextRefresh ? `next ${when(t.nextRefresh)}` : null].filter(Boolean).join(" · ");
+    box.append(el("h4", { class: "hub-section", text: "Playlist auto-refresh" }),
+      el("div", { class: "card tool-card" }, el("div", { class: "opt-row" },
+        el("div", { class: "grow" }, el("div", { class: "title", text: "Refresh their playlists" }), el("div", { class: "sub", text: refreshSub || "Keeps channel lists up to date." })),
+        pick)));
+
+    // TV guide
+    const guides = (t.guides || []).slice().sort((a, b) => a.name.localeCompare(b.name));
+    const status = t.epgClearing ? "Clearing the guide…" : t.epgLoading ? "Fetching the guide now…" : null;
+    const fetch = el("button", { class: "btn btn-white", type: "button", text: t.epgLoading ? "Fetching…" : "Fetch guide" });
+    fetch.disabled = !!(t.epgLoading || t.epgClearing);
+    fetch.addEventListener("click", () => run("refreshGuide", {}, fetch));
+    const clear = el("button", { class: "btn danger", type: "button", text: t.epgClearing ? "Clearing…" : "Clear guide" });
+    clear.disabled = !!(t.epgLoading || t.epgClearing);
+    clear.addEventListener("click", () => {
+      if (confirm("Clear their whole TV guide? It stays empty until it's fetched again, which can take a few minutes.")) run("clearGuide", {}, clear);
+    });
+    box.append(el("h4", { class: "hub-section", text: "TV guide" }),
+      el("div", { class: "card tool-card" },
+        status ? el("div", { class: "tool-status" }, el("span", { class: "live-dot", text: "●" }), " " + status) : null,
+        guides.length ? el("div", {}, guides.map((g) => {
+          const old = Date.now() / 1000 - g.at > 36 * 3600;
+          return el("div", { class: "mc-fact" }, el("span", { text: g.name }),
+            el("span", { class: old ? "bad-text" : "", text: `Updated ${ago(g.at)}` }));
+        })) : el("p", { class: "sub", text: status ? "" : "No guide stored yet." }),
+        el("p", { class: "hint tool-hint", text: "If programmes are missing or wrong, Fetch first. If that doesn't fix it, Clear, then Fetch." }),
+        el("div", { class: "row-actions" }, fetch, clear)));
+
+    // Copy Setup
+    const copy = el("button", { class: "item cat-row", type: "button" },
+      el("div", { class: "grow" }, el("div", { class: "title", text: "Copy your setup to theirs" }),
+        el("div", { class: "sub wrap-sub", text: "Playlists, categories, favourites and Sports Hub from your own device." })),
+      el("span", { class: "chev", text: "›" }));
+    copy.addEventListener("click", () => showTab("copy"));
+    box.append(el("h4", { class: "hub-section", text: "Copy setup" }), el("div", { class: "list" }, copy));
+  }
 
   function renderServers() {
     const list = $("server-list");
@@ -1172,7 +1244,7 @@
     again.addEventListener("click", runHealthCheck);
 
     const problems = data && data.problems || 0;
-    if (!currentTab) renderHome();
+    if (!currentTab || currentTab === "selection") renderHome();
 
     let headline = "Checking their setup…";
     if (data && data.error) headline = data.error;
@@ -1594,6 +1666,7 @@
     const panel = $("tab-remote");
     const keepFocus = document.activeElement && document.activeElement.dataset.remotefilter;
     panel.replaceChildren();
+    if (mc.open) { renderMatchCentre(panel); return; }
 
     // On their screen now, with the player's controls while something plays.
     const np = nowPlaying();
@@ -1680,6 +1753,512 @@
     const b = el("button", { class: "btn ctl " + (cls || ""), type: "button", "aria-label": title, title, text: label });
     b.addEventListener("click", () => control(fields, b));
     return b;
+  }
+
+  // ---------- Match centre: the app's match screen, on the phone ----------
+  // `matchCentre` returns the device's own detail record. The match on THEIR screen comes held
+  // to their picture (StreamSyncEngine.present on the device), so nothing here runs ahead of
+  // their TV. Polled while open: 5s for a synced live match, 20s live, 60s otherwise.
+  const mc = { open: false, id: null, code: null, league: null, data: null, table: null, synced: false, delay: null,
+               tab: null, pickedTab: false, lineupSide: "home", innings: null, groupsAll: false, timer: null, error: null };
+
+  function openMatchCentre(id, opts = {}) {
+    Object.assign(mc, { open: true, id, code: opts.code || null, league: opts.league || null, data: null, table: null,
+                        synced: false, delay: null, tab: null, pickedTab: false, lineupSide: "home", innings: null, groupsAll: false, error: null });
+    remote.scrollBack = window.scrollY;
+    renderRemote();
+    window.scrollTo({ top: 0 });
+    loadMatchCentre(true);
+  }
+  function closeMatchCentre() {
+    mc.open = false;
+    clearTimeout(mc.timer);
+    renderRemote();
+    if (remote.scrollBack) window.scrollTo({ top: remote.scrollBack });
+  }
+  async function loadMatchCentre(first = false) {
+    clearTimeout(mc.timer);
+    if (!mc.open) return;
+    // Away from the Remote (or the page hidden): wait, don't keep asking their device.
+    if (!first && (currentTab !== "remote" || document.hidden)) { mc.timer = setTimeout(() => loadMatchCentre(), 5000); return; }
+    const id = mc.id;
+    const r = await command("matchCentre", { fixture: id, code: mc.code, league: mc.league, table: first || !mc.table });
+    if (!mc.open || mc.id !== id) return;
+    if (r.ok) {
+      mc.data = r.match;
+      if (r.table) mc.table = r.table;
+      mc.synced = !!r.synced;
+      mc.delay = r.delay ?? null;
+      mc.error = null;
+    } else if (!mc.data) {
+      mc.error = r.message || "Couldn't load that match.";
+    }
+    if (currentTab === "remote" && !document.hidden && !busy("tab-remote")) renderRemote();
+    const live = mc.data && mcState(mc.data) === "in";
+    mc.timer = setTimeout(() => loadMatchCentre(), live ? (mc.synced ? 5000 : 20000) : 60000);
+  }
+
+  // ----- reading the record -----
+  const mcState = (f) => (f.status && (f.status.state || (f.status.short === "FT" ? "post" : null))) || "pre";
+  const mcIsLive = (f) => mcState(f) === "in";
+  const mcIsDone = (f) => mcState(f) === "post";
+  const isSport = (f, s) => String(f.sport || "").toLowerCase() === s;
+  function mcStatusText(f) {
+    const st = f.status || {};
+    if (f.cricket) {
+      if (f.cricket.inBreak && f.cricket.breakLabel) return f.cricket.breakLabel;
+      if (mcIsLive(f)) return f.cricket.dayLabel || "Live";
+    }
+    if (mcIsLive(f)) {
+      const d = String(st.description || st.detail || "");
+      if (/half/i.test(d) && /time/i.test(d) || st.short === "HT") return "Half time";
+      return st.clock && st.clock !== "0'" ? st.clock : (d || "Live");
+    }
+    if (mcIsDone(f)) return st.description && st.description.length < 14 ? st.description : "Full time";
+    const t = Date.parse(f.startTime) / 1000;
+    return isNaN(t) ? "" : `${dayText(t)} · ${timeText(t)}`;
+  }
+  const sideOf = (f, e) => {
+    const id = String(e.teamId || "");
+    if (id && f.home && String(f.home.id || "").replace(/^\D+-/, "") === id.replace(/^\D+-/, "")) return "home";
+    if (id && f.away && String(f.away.id || "").replace(/^\D+-/, "") === id.replace(/^\D+-/, "")) return "away";
+    if (e.team && f.home && e.team === f.home.name) return "home";
+    if (e.team && f.away && e.team === f.away.name) return "away";
+    return null;
+  };
+  const evKind = (e) => {
+    const t = String(e.type || "").toLowerCase();
+    if (/own goal/.test(t)) return "og";
+    if (/penalty.*(scored|goal)/.test(t)) return "pen";
+    if (/penalty.*(missed|saved)/.test(t)) return "penmiss";
+    if (/goal|touchdown|field goal|try\b|home run/.test(t) || e.scoringPlay) return "goal";
+    if (/red card|second yellow/.test(t)) return "red";
+    if (/yellow/.test(t)) return "yellow";
+    if (/substitution|sub\b/.test(t)) return "sub";
+    if (/var|disallowed/.test(t)) return "var";
+    return "other";
+  };
+  const EV_ICON = { goal: "⚽", pen: "⚽", og: "⚽", penmiss: "✕", red: "", yellow: "", sub: "⇄", var: "VAR", other: "•" };
+  const minuteNum = (e) => {
+    const m = String(e.time || "").match(/(\d+)(?:'?\s*\+\s*(\d+))?/);
+    return m ? Number(m[1]) + (m[2] ? Number(m[2]) / 100 : 0) : 0;
+  };
+  function teamColor(t, fallback, key = "color") {
+    const c = String((t && t[key]) || "").replace(/^#?/, "#");
+    return /^#[0-9a-f]{6}$/i.test(c) && !/^#(000000|ffffff)$/i.test(c) ? c : fallback;
+  }
+  // The two sides' colours, the away one swapped when they'd read as the same (the app's
+  // clash rule): its second colour, else a neutral blue.
+  function mcColors(f) {
+    const rgb = (h) => [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16));
+    const hsl = (h) => {
+      const [r, g, b] = rgb(h).map((v) => v / 255), mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn;
+      const hue = d === 0 ? 0 : mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4;
+      return { h: (hue * 60 + 360) % 360, s: d === 0 ? 0 : d / (1 - Math.abs(mx + mn - 1)) };
+    };
+    // Same at a glance: close in RGB, or the same hue family when both are strong colours
+    // (United's red and Villa's claret are far apart in RGB and still both "red").
+    const near = (a, b) => {
+      const x = rgb(a), y = rgb(b);
+      if (Math.hypot(x[0] - y[0], x[1] - y[1], x[2] - y[2]) < 120) return true;
+      const p = hsl(a), q = hsl(b), dh = Math.min(Math.abs(p.h - q.h), 360 - Math.abs(p.h - q.h));
+      return p.s > 0.35 && q.s > 0.35 && dh < 28;
+    };
+    const home = teamColor(f.home, "#1E7CFF");
+    let away = teamColor(f.away, "#E5484D");
+    if (near(home, away)) {
+      const alt = teamColor(f.away, null, "altColor");
+      away = alt && !near(home, alt) ? alt : near(home, "#5FB7E6") ? "#E8EDF5" : "#5FB7E6";
+    }
+    return { home, away };
+  }
+  // ESPN's stat labels as the app shows them.
+  const STAT_NAMES = { "shots": "Shots", "on goal": "Shots on target", "corner kicks": "Corners", "on target %": "Shot accuracy",
+    "effective tackles": "Tackles won", "effective clearances": "Clearances", "accurate passes": "Accurate passes" };
+  const statName = (raw) => {
+    const k = String(raw || "").toLowerCase();
+    if (STAT_NAMES[k]) return STAT_NAMES[k];
+    return raw === String(raw).toUpperCase() ? k.charAt(0).toUpperCase() + k.slice(1) : raw;
+  };
+  const shortName = (n) => String(n || "").split(" ").length > 1 ? String(n).split(" ").slice(-1)[0] : String(n || "");
+
+  // ----- the screen -----
+  function renderMatchCentre(panel) {
+    panel.append(crumb([["Remote", closeMatchCentre], ["Match centre", null]]));
+    const f = mc.data;
+    if (!f) {
+      panel.append(el("p", { class: "empty", text: mc.error || "Loading the match…" }));
+      return;
+    }
+    panel.append(mcHeader(f));
+    const tabs = mcTabs(f);
+    if (!mc.pickedTab || !tabs.some((t) => t.id === mc.tab)) mc.tab = mcDefaultTab(f, tabs);
+    panel.append(el("div", { class: "mc-tabs" }, tabs.map((t) => {
+      const b = el("button", { class: "mc-tab" + (t.id === mc.tab ? " active" : ""), type: "button", text: t.title });
+      b.addEventListener("click", () => { mc.tab = t.id; mc.pickedTab = true; renderRemote(); });
+      return b;
+    })));
+    const body = el("div", { class: "mc-body" });
+    panel.append(body);
+    ({ summary: mcSummary, stats: mcStats, scorecard: mcScorecard, lineups: mcLineups, table: mcTable, h2h: mcH2H })[mc.tab](body, f);
+  }
+
+  function mcTabs(f) {
+    const tabs = [{ id: "summary", title: "Summary" }];
+    const hasStats = f.stats && (f.stats.home || []).length;
+    const matchTitle = mcIsLive(f) ? "Live" : mcIsDone(f) ? "Match" : "Stats";
+    if (!f.cricket || !(f.cricket.scorecard || []).length) tabs.push({ id: "stats", title: hasStats || !f.cricket ? matchTitle : "Stats" });
+    if (f.cricket && (f.cricket.scorecard || []).length) tabs.push({ id: "scorecard", title: "Scorecard" });
+    if (f.lineups && ((f.lineups.home || []).length || (f.lineups.away || []).length)) tabs.push({ id: "lineups", title: "Lineups" });
+    if (mcTableRows().length) tabs.push({ id: "table", title: /basketball|baseball|american football|hockey/.test(String(f.sport).toLowerCase()) ? "Standings" : "Table" });
+    const adv = f.advanced || {};
+    if ((adv.headToHead || []).length || Object.keys(adv.form || {}).length) tabs.push({ id: "h2h", title: "H2H & Form" });
+    return tabs;
+  }
+  function mcDefaultTab(f, tabs) {
+    const has = (id) => tabs.some((t) => t.id === id);
+    if (f.cricket && mcIsLive(f) && !f.cricket.inBreak && has("scorecard")) return "scorecard";
+    if (mcIsLive(f) && has("stats")) return "stats";
+    if (mcIsDone(f) && has("lineups")) return "lineups";
+    return "summary";
+  }
+
+  function mcHeader(f) {
+    const { home: hc, away: ac } = mcColors(f);
+    const head = el("div", { class: "mc-head" });
+    head.style.setProperty("--home", hc);
+    head.style.setProperty("--away", ac);
+    const adv = f.advanced || {}, gi = adv.gameInfo || {};
+    const round = gi.round ? (isNaN(gi.round) ? gi.round : `Matchweek ${gi.round}`) : (f.cricket && f.cricket.matchTitle) || "";
+    head.append(el("div", { class: "mc-league" }, art(f.leagueLogo, "logo", f.league),
+      el("span", { class: "grow", text: [f.league, round].filter(Boolean).join(" · ") })));
+
+    const live = mcIsLive(f), done = mcIsDone(f), pre = !live && !done;
+    // Cricket: each side's innings in cricket notation sits under its own name ("434/9d",
+    // "114/3 (27.1 ov)"), the batting side's brighter.
+    const cline = (side) => f.cricket && f.cricket[side] && f.cricket[side].scoreLine;
+    const batting = f.cricket && String(f.cricket.battingTeamId || "");
+    const team = (t, side) => el("div", { class: `mc-team ${side}` }, art(t.logo, "logo", t.name), el("div", { class: "mc-team-name", text: t.name }),
+      f.cricket ? el("div", { class: "mc-cricket-line" + (batting && String(t.id) === batting ? " batting" : ""), text: cline(side) || "Yet to bat" }) : null);
+    let middle;
+    if (f.cricket) {
+      middle = el("div", { class: "mc-mid" }, el("div", { class: "mc-vs", text: "v" }));
+    } else if (pre) {
+      const t = Date.parse(f.startTime) / 1000;
+      middle = el("div", { class: "mc-mid" }, el("div", { class: "mc-kickoff", text: isNaN(t) ? "TBC" : timeText(t) }));
+    } else {
+      const s = f.score || {};
+      middle = el("div", { class: "mc-mid" }, el("div", { class: "mc-score" },
+        el("span", { text: String(s.home ?? 0) }), el("span", { class: "mc-dash", text: "–" }), el("span", { text: String(s.away ?? 0) })));
+    }
+    head.append(el("div", { class: "mc-board" }, team(f.home, "home"), middle, team(f.away, "away")));
+    const statusCls = live ? (f.cricket && f.cricket.inBreak ? "mc-status brk" : "mc-status live") : "mc-status";
+    head.append(el("div", { class: "mc-status-row" }, el("span", { class: statusCls, text: mcStatusText(f) })));
+    if (f.cricket && (f.cricket.detail || f.cricket.summary)) head.append(el("div", { class: "mc-situation", text: f.cricket.detail || f.cricket.summary }));
+
+    // Scorers under each side, the app's broadcast style.
+    if (!f.cricket) {
+      const goals = (f.events || f.timeline || []).filter((e) => ["goal", "pen", "og"].includes(evKind(e)));
+      const col = (side) => el("div", { class: `mc-scorers ${side}` }, goals.filter((e) => {
+        const s = sideOf(f, e);
+        return evKind(e) === "og" ? s !== side && s : s === side;
+      }).map((e) => el("div", { text: `${shortName(e.player)} ${e.time || ""}${evKind(e) === "pen" ? " (P)" : evKind(e) === "og" ? " (OG)" : ""}` })));
+      if (goals.length) head.append(el("div", { class: "mc-scorer-row" }, col("home"), el("span", { class: "mc-ball", text: "⚽" }), col("away")));
+    }
+    if (mc.synced) head.append(el("div", { class: "mc-sync" }, el("span", { class: "mc-sync-dot" }),
+      `Synced to their TV${mc.delay != null ? ` · ${Math.abs(mc.delay)}s ${mc.delay >= 0 ? "behind" : "ahead of"} the live data` : ""}`));
+    return head;
+  }
+
+  // ----- Summary: key events, then the match facts -----
+  function mcSummary(body, f) {
+    const evs = (f.timeline && f.timeline.length ? f.timeline : f.events || []).filter((e) => evKind(e) !== "other" || e.scoringPlay);
+    if (f.cricket) {
+      const c = f.cricket;
+      const card = el("div", { class: "card mc-card" }, el("div", { class: "mc-card-title", text: "Match" }));
+      if (c.playerOfMatch && c.playerOfMatch.name) card.append(mcFact("Player of the match", [c.playerOfMatch.name, c.playerOfMatch.team].filter(Boolean).join(" · ")));
+      if (c.toss) card.append(mcFact("Toss", c.toss.replace(/\s+,/g, ",")));
+      if (c.series) card.append(mcFact("Series", c.series));
+      if (c.hoursOfPlay) card.append(mcFact("Hours of play", c.hoursOfPlay));
+      if (card.children.length > 1) body.append(card);
+      const notes = c.dayNotes || [];
+      if (notes.length) body.append(el("div", { class: "card mc-card" }, el("div", { class: "mc-card-title", text: "Day by day" }),
+        ...notes.map((n) => el("div", { class: "mc-note", text: n.replace(/^day (\d+)\s*-\s*/i, "Day $1 · ") }))));
+    } else if (evs.length) {
+      const sorted = evs.slice().sort((a, b) => (a.period || 0) - (b.period || 0) || minuteNum(a) - minuteNum(b));
+      const list = el("div", { class: "mc-timeline" });
+      let lastPeriod = null;
+      for (const e of sorted) {
+        if (lastPeriod !== null && e.period !== lastPeriod) list.append(el("div", { class: "mc-period", text: isSport(f, "soccer") && lastPeriod === 1 ? "Half time" : `End of period ${lastPeriod}` }));
+        lastPeriod = e.period;
+        const side = sideOf(f, e), kind = evKind(e);
+        const icon = el("span", { class: `mc-ev-icon ${kind}`, text: EV_ICON[kind] });
+        let main = e.player || e.type, sub = kind === "sub" ? (e.assist ? `off: ${e.assist}` : "") : kind === "goal" && e.assist ? `assist: ${e.assist}` : kind === "pen" ? "Penalty" : kind === "og" ? "Own goal" : "";
+        if (kind === "sub" && !e.assist && e.description) {
+          const m = String(e.description).match(/(.+?) replaces (.+?)[.,]/i);
+          if (m) { main = m[1].replace(/^Substitution,?\s*[^.]*\.\s*/i, ""); sub = `off: ${m[2]}`; }
+        }
+        const text = el("div", { class: "mc-ev-text" }, el("div", { class: "mc-ev-main", text: main }), sub ? el("div", { class: "sub", text: sub }) : null);
+        const score = e.homeScore != null && e.awayScore != null ? el("span", { class: "mc-ev-score", text: `${e.homeScore}–${e.awayScore}` }) : null;
+        list.append(el("div", { class: `mc-ev ${side || "mid"}` },
+          el("div", { class: "mc-ev-side home" }, side === "home" ? [text, score] : null),
+          el("div", { class: "mc-ev-min" }, el("span", { text: e.time || "" }), icon),
+          el("div", { class: "mc-ev-side away" }, side === "away" ? [score, text] : null)));
+      }
+      if (mcIsDone(f)) list.append(el("div", { class: "mc-period", text: "Full time" }));
+      body.append(el("div", { class: "card mc-card" }, el("div", { class: "mc-card-title", text: "Key events" }), list));
+    } else {
+      body.append(el("p", { class: "empty", text: mcIsLive(f) || mcIsDone(f) ? "No key events yet." : "Key events appear here once it starts." }));
+    }
+
+    // Recent form strip (the app's summary carries it too)
+    const form = (f.advanced || {}).form || {};
+    const formRow = (t) => {
+      const key = Object.keys(form).find((k) => String(t.id || "").endsWith(k));
+      const list = key ? form[key] : null;
+      return list && list.length ? el("div", { class: "mc-form-row" }, art(t.logo, "logo", t.name), el("span", { class: "grow mc-form-name", text: t.name }),
+        el("span", { class: "mc-form" }, list.slice(0, 5).map((x) => el("span", { class: `mc-wdl ${x.result}`, text: x.result })))) : null;
+    };
+    const fr = [formRow(f.home), formRow(f.away)].filter(Boolean);
+    if (fr.length) body.append(el("div", { class: "card mc-card" }, el("div", { class: "mc-card-title", text: "Form" }), ...fr));
+
+    // Venue + match facts
+    const gi = (f.advanced || {}).gameInfo || {}, v = gi.venue || {};
+    const facts = [];
+    if (v.name) facts.push(["Venue", [v.name, v.city].filter(Boolean).join(", ")]);
+    if (v.capacity) facts.push(["Capacity", Number(v.capacity).toLocaleString()]);
+    if (gi.attendance) facts.push(["Attendance", Number(gi.attendance).toLocaleString()]);
+    const ref = (gi.officials || []).map((o) => (typeof o === "string" ? o : o.name)).filter(Boolean);
+    if (ref.length) facts.push(["Referee", ref[0]]);
+    if (f.cricket && f.cricket.venue && !v.name) facts.push(["Venue", f.cricket.venue]);
+    const t = Date.parse(f.startTime) / 1000;
+    const startWord = f.cricket ? (mcIsDone(f) ? "Played" : "Start of play") : mcIsDone(f) ? "Played" : "Kick-off";
+    if (!isNaN(t)) facts.push([startWord, `${dayText(t)} · ${timeText(t)}`]);
+    if (facts.length || v.thumb) {
+      const card = el("div", { class: "card mc-card mc-venue" });
+      if (v.thumb) card.append(art(v.thumb, "venue", v.name));
+      card.append(...facts.map(([k, val]) => mcFact(k, val)));
+      body.append(card);
+    }
+  }
+  const shortDate = (iso) => {
+    const d = new Date(String(iso || "").slice(0, 10) + "T12:00:00");
+    if (isNaN(d)) return iso || "";
+    return d.toLocaleDateString(undefined, { day: "numeric", month: "short", ...(d.getFullYear() !== new Date().getFullYear() ? { year: "numeric" } : {}) });
+  };
+  const mcFact = (k, v) => el("div", { class: "mc-fact" }, el("span", { class: "sub", text: k }), el("span", { text: v }));
+
+  // ----- Stats: bars in the app's order -----
+  const STAT_ORDER = ["expected goals", "xg", "possession", "shots", "on goal", "shots on target", "big chances", "corner kicks", "corners",
+    "fouls", "yellow cards", "red cards", "offsides", "saves", "passes", "pass completion %", "accurate passes", "tackles", "interceptions", "clearances", "crosses", "long balls", "blocked shots"];
+  function mcStats(body, f) {
+    const home = (f.stats && f.stats.home) || [], away = (f.stats && f.stats.away) || [];
+    if (!home.length) {
+      const t = Date.parse(f.startTime) / 1000;
+      body.append(el("div", { class: "card mc-card mc-countdown" },
+        el("div", { class: "mc-card-title", text: mcIsDone(f) ? "No statistics for this match" : "Statistics start at kick-off" }),
+        !isNaN(t) && !mcIsDone(f) ? el("div", { class: "title-lg", text: `${dayText(t)} · ${timeText(t)}` }) : null));
+      return;
+    }
+    const byLabel = (list) => new Map(list.map((s) => [String(s.label || s.name).toLowerCase(), s]));
+    const hm = byLabel(home), am = byLabel(away);
+    const labels = [...hm.keys()].filter((k) => am.has(k));
+    labels.sort((a, b) => {
+      const ia = STAT_ORDER.indexOf(a), ib = STAT_ORDER.indexOf(b);
+      return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+    });
+    const num = (s) => parseFloat(String(s.value).replace(/[^\d.\-]/g, "")) || 0;
+    const fmt = (label, s) => {
+      const n = num(s);
+      if (/%|possession/.test(label)) return (n <= 1 && !/possession/.test(label) ? Math.round(n * 100) : Math.round(n)) + "%";
+      return String(s.value);
+    };
+    const { home: hc, away: ac } = mcColors(f);
+    const card = el("div", { class: "card mc-card mc-stats" },
+      el("div", { class: "mc-stats-head" }, art(f.home.logo, "logo", f.home.name), el("span", { class: "mc-card-title grow", text: "Team stats" }), art(f.away.logo, "logo", f.away.name)));
+    for (const label of labels.slice(0, 24)) {
+      const h = hm.get(label), a = am.get(label);
+      const hv = num(h), av = num(a), total = hv + av || 1;
+      const hb = el("span", { class: "mc-bar-fill home" }), ab = el("span", { class: "mc-bar-fill away" });
+      hb.style.width = (hv / total) * 100 + "%";
+      ab.style.width = (av / total) * 100 + "%";
+      hb.style.background = hc; ab.style.background = ac;
+      if (hv < av) hb.classList.add("dim"); else if (av < hv) ab.classList.add("dim");
+      card.append(el("div", { class: "mc-stat" },
+        el("div", { class: "mc-stat-row" }, el("strong", { text: fmt(label, h) }), el("span", { class: "mc-stat-label", text: statName(h.label || h.name) }), el("strong", { text: fmt(label, a) })),
+        el("div", { class: "mc-bar" }, el("span", { class: "mc-bar-half home" }, hb), el("span", { class: "mc-bar-half away" }, ab))));
+    }
+    body.append(card);
+  }
+
+  // ----- Line-ups: the pitch -----
+  function posLine(code) {
+    const c = String(code || "").toUpperCase();
+    if (/^G/.test(c)) return 0;
+    if (/^(CD|CB|D|LB|RB|LWB|RWB|SW|DEF)/.test(c)) return 1;
+    if (/^(DM|CDM)/.test(c)) return 2;
+    if (/^(AM|CAM|LAM|RAM)/.test(c)) return 4;
+    if (/^(F|CF|ST|S|LW|RW|LF|RF|FW)/.test(c)) return 5;
+    return 3;
+  }
+  function posX(code) {
+    const c = String(code || "").toUpperCase();
+    if (/^(LB|LWB|LM|LW|LF|LAM)/.test(c) || /-L$/.test(c) && /^L/.test(c)) return 0;
+    if (/^(RB|RWB|RM|RW|RF|RAM)/.test(c)) return 4;
+    if (/-L$/.test(c)) return 1;
+    if (/-R$/.test(c)) return 3;
+    return 2;
+  }
+  function mcLineups(body, f) {
+    const L = f.lineups || {};
+    const sides = ["home", "away"].filter((s) => (L[s] || []).length);
+    if (!sides.includes(mc.lineupSide)) mc.lineupSide = sides[0];
+    body.append(el("div", { class: "subtabs mc-side-pick" }, sides.map((s) => {
+      const t = f[s];
+      const b = el("button", { class: "subtab" + (mc.lineupSide === s ? " active" : ""), type: "button" }, art(t.logo, "logo", t.name), ` ${t.name}`);
+      b.addEventListener("click", () => { mc.lineupSide = s; renderRemote(); });
+      return b;
+    })));
+    const side = mc.lineupSide, team = f[side], players = L[side] || [];
+    const starters = players.filter((p) => p.starter !== false).slice(0, 11);
+    const bench = players.filter((p) => !starters.includes(p));
+    // Goals / cards / subs per player, from the (held) timeline.
+    const evs = (f.timeline && f.timeline.length ? f.timeline : f.events || []);
+    const marks = (p) => {
+      const n = String(p.name || "").toLowerCase(), last = shortName(p.name).toLowerCase();
+      const mine = evs.filter((e) => { const who = String(e.player || "").toLowerCase(); return who && (who === n || (last.length > 3 && who.endsWith(last))); });
+      const out = [];
+      for (const e of mine) {
+        const k = evKind(e);
+        if (["goal", "pen"].includes(k)) out.push(el("span", { class: "pm goal", text: "⚽" }));
+        else if (k === "yellow") out.push(el("span", { class: "pm yellow" }));
+        else if (k === "red") out.push(el("span", { class: "pm red" }));
+      }
+      if (p.subbedOut) out.push(el("span", { class: "pm off", text: "▼" }));
+      if (p.subbedIn) out.push(el("span", { class: "pm on", text: "▲" }));
+      return out;
+    };
+    const colour = mcColors(f)[side];
+    const soccerish = isSport(f, "soccer") || starters.some((p) => /^(G|CD|CB|LB|RB|CM|CF|AM|DM)/i.test(p.position || ""));
+    const formation = L[side + "Formation"];
+    if (soccerish && starters.length >= 7) {
+      const lines = new Map();
+      for (const p of starters) {
+        const ln = posLine(p.position);
+        if (!lines.has(ln)) lines.set(ln, []);
+        lines.get(ln).push(p);
+      }
+      const pitch = el("div", { class: "mc-pitch" }, el("div", { class: "mc-pitch-lines" }));
+      pitch.style.setProperty("--kit", colour);
+      const rows = [...lines.keys()].sort((a, b) => b - a);              // attack at the top
+      rows.forEach((ln, i) => {
+        const row = el("div", { class: "mc-pitch-row" });
+        row.style.top = 8 + (i / Math.max(1, rows.length - 1)) * 80 + "%";
+        lines.get(ln).sort((a, b) => posX(a.position) - posX(b.position)).forEach((p) => {
+          row.append(el("div", { class: "mc-player" },
+            el("span", { class: "mc-shirt" + (ln === 0 ? " gk" : ""), text: p.number || "" }, el("span", { class: "mc-marks" }, marks(p))),
+            el("span", { class: "mc-player-name", text: shortName(p.name) })));
+        });
+        pitch.append(row);
+      });
+      body.append(el("div", { class: "card mc-card mc-pitch-card" },
+        el("div", { class: "mc-card-title" }, `${team.name}${formation ? " · " + formation : ""}`), pitch));
+    } else {
+      body.append(el("div", { class: "card mc-card" }, el("div", { class: "mc-card-title", text: `${team.name} · starters` }),
+        ...starters.map((p) => mcPlayerRow(p, marks(p)))));
+    }
+    if (bench.length) {
+      body.append(el("div", { class: "card mc-card" }, el("div", { class: "mc-card-title", text: "Substitutes" }),
+        ...bench.map((p) => mcPlayerRow(p, marks(p)))));
+    }
+  }
+  const mcPlayerRow = (p, marks) => el("div", { class: "mc-player-row" },
+    el("span", { class: "mc-num", text: p.number || "" }), el("span", { class: "grow", text: p.name }),
+    el("span", { class: "mc-marks inline" }, marks), el("span", { class: "sub", text: /^sub/i.test(p.position || "") ? "" : p.position || "" }));
+
+  // ----- Table -----
+  function mcTableRows() {
+    const t = mc.table;
+    if (!t) return [];
+    if (t.groups && t.groups.length) return t.groups;
+    return t.table && t.table.length ? [{ name: "", table: t.table }] : [];
+  }
+  function mcTable(body, f) {
+    const groups = mcTableRows();
+    const ids = [f.home, f.away].map((t) => String(t.id || "").replace(/^\D+-/, ""));
+    const names = [f.home.name, f.away.name];
+    const ours = (r) => ids.includes(String(r.team.id || "").replace(/^\D+-/, "")) || names.includes(r.team.name);
+    const mine = groups.filter((g) => g.table.some(ours));
+    const shown = mc.groupsAll || !mine.length ? groups : mine;
+    const noDraws = groups.every((g) => g.table.every((r) => !r.drawn));
+    for (const g of shown) {
+      const table = el("table", { class: "mc-league-table" },
+        el("thead", {}, el("tr", {}, el("th", { text: "#" }), el("th", { class: "team", text: "Team" }), el("th", { text: "P" }),
+          el("th", { text: "W" }), noDraws ? null : el("th", { text: "D" }), el("th", { text: "L" }), el("th", { text: isSport(f, "soccer") ? "GD" : "+/-" }), el("th", { text: "Pts" }))),
+        el("tbody", {}, g.table.map((r) => el("tr", { class: ours(r) ? "ours" : "" },
+          el("td", { text: String(r.rank) }),
+          el("td", { class: "team" }, art(r.team.logo, "logo", r.team.name), el("span", { text: r.team.name })),
+          el("td", { text: String(r.played) }), el("td", { text: String(r.won) }), noDraws ? null : el("td", { text: String(r.drawn) }),
+          el("td", { text: String(r.lost) }), el("td", { text: (r.goalsDiff > 0 ? "+" : "") + Math.round(r.goalsDiff) }), el("td", { class: "pts", text: String(r.points) })))));
+      body.append(el("div", { class: "card mc-card mc-table-card" }, g.name ? el("div", { class: "mc-card-title", text: g.name }) : null, table));
+    }
+    if (mine.length && mine.length < groups.length) {
+      const b = el("button", { class: "btn small", type: "button", text: mc.groupsAll ? "Just their group" : "Every group" });
+      b.addEventListener("click", () => { mc.groupsAll = !mc.groupsAll; renderRemote(); });
+      body.append(el("div", { class: "row-actions center-row" }, b));
+    }
+  }
+
+  // ----- H2H & Form -----
+  function mcH2H(body, f) {
+    const adv = f.advanced || {};
+    const form = adv.form || {};
+    for (const t of [f.home, f.away]) {
+      const key = Object.keys(form).find((k) => String(t.id || "").endsWith(k));
+      const list = key ? form[key] : [];
+      if (!list.length) continue;
+      body.append(el("div", { class: "card mc-card" },
+        el("div", { class: "mc-card-title" }, art(t.logo, "logo", t.name), ` ${t.name} · last ${list.length}`),
+        ...list.map((x) => el("div", { class: "mc-form-game" }, el("span", { class: `mc-wdl ${x.result}`, text: x.result }),
+          el("div", { class: "grow" }, el("div", { text: `v ${x.opponent}` }), el("div", { class: "sub", text: [x.league, shortDate(x.date)].filter(Boolean).join(" · ") })),
+          el("strong", { text: x.score })))));
+    }
+    const h2h = adv.headToHead || [];
+    if (h2h.length) {
+      body.append(el("div", { class: "card mc-card" }, el("div", { class: "mc-card-title", text: "Head to head" }),
+        ...h2h.map((g) => el("div", { class: "mc-form-game" },
+          el("div", { class: "grow" }, el("div", {}, el("strong", { text: g.homeTeam }), ` ${g.score}`),
+            el("div", { class: "sub", text: [g.league, shortDate(g.date)].filter(Boolean).join(" · ") })),
+          g.winner ? el("span", { class: "subtab-badge", text: g.winner === "Draw" ? "Draw" : shortName(g.winner) }) : null))));
+    }
+  }
+
+  // ----- Cricket scorecard -----
+  function mcScorecard(body, f) {
+    const cards = (f.cricket && f.cricket.scorecard) || [];
+    if (!cards.length) { body.append(el("p", { class: "empty", text: "No scorecard yet." })); return; }
+    const current = ((f.cricket.innings || []).find((i) => i.isCurrent) || {}).number;
+    if (!cards.some((c) => c.number === mc.innings)) mc.innings = current || cards[cards.length - 1].number;
+    body.append(el("div", { class: "subtabs" }, cards.map((c) => {
+      const total = (f.cricket.innings || []).find((i) => i.number === c.number);
+      const b = el("button", { class: "subtab" + (c.number === mc.innings ? " active" : ""), type: "button",
+        text: `${shortName(c.teamName) || "Innings " + c.number}${total ? " " + (total.allOut ? total.runs : `${total.runs}/${total.wickets}`) : ""}` });
+      b.addEventListener("click", () => { mc.innings = c.number; renderRemote(); });
+      return b;
+    })));
+    const c = cards.find((x) => x.number === mc.innings);
+    const bat = el("table", { class: "mc-cricket" },
+      el("thead", {}, el("tr", {}, el("th", { class: "team", text: "Batter" }), el("th", { text: "R" }), el("th", { text: "B" }), el("th", { text: "4s" }), el("th", { text: "6s" }), el("th", { text: "SR" }))),
+      el("tbody", {}, (c.batting || []).map((b) => el("tr", { class: b.out === false ? "notout" : "" },
+        el("td", { class: "team" }, el("div", { text: b.name + (b.out === false ? "*" : "") }), b.dismissal ? el("div", { class: "sub", text: b.dismissal }) : null),
+        el("td", { class: "pts", text: String(b.runs) }), el("td", { text: String(b.balls) }), el("td", { text: String(b.fours) }), el("td", { text: String(b.sixes) }), el("td", { text: b.strikeRate || "" })))));
+    const bowl = el("table", { class: "mc-cricket" },
+      el("thead", {}, el("tr", {}, el("th", { class: "team", text: "Bowler" }), el("th", { text: "O" }), el("th", { text: "M" }), el("th", { text: "R" }), el("th", { text: "W" }), el("th", { text: "Econ" }))),
+      el("tbody", {}, (c.bowling || []).map((b) => el("tr", {},
+        el("td", { class: "team", text: b.name }), el("td", { text: b.overs }), el("td", { text: String(b.maidens) }), el("td", { text: String(b.runs) }),
+        el("td", { class: "pts", text: String(b.wickets) }), el("td", { text: b.economy || "" })))));
+    body.append(el("div", { class: "card mc-card mc-table-card" }, el("div", { class: "mc-card-title", text: `${c.teamName || ""} batting` }), bat),
+      el("div", { class: "card mc-card mc-table-card" }, el("div", { class: "mc-card-title", text: "Bowling" }), bowl));
   }
 
   // ---------- Catch-up scrub bar ----------
@@ -1783,7 +2362,12 @@
           kindText ? el("span", { class: np.kind === "live" ? "live-dot" : "tag", text: kindText.toUpperCase() }) : null,
           ` ${where}${np.paused ? " · Paused" : ""}`)),
       stop));
-    if (np.fixture) card.append(el("div", { class: "np-fixture", text: `🏆 ${np.fixture}${np.score ? "  " + np.score : ""}` }));
+    if (np.fixture) {
+      const open = np.fixtureID ? el("button", { class: "btn small", type: "button", text: "Match centre ›" }) : null;
+      if (open) open.addEventListener("click", () => openMatchCentre(np.fixtureID));
+      card.append(el("div", { class: "np-fixture row-actions tight" },
+        el("span", { class: "grow", text: `🏆 ${np.fixture}${np.score ? "  " + np.score : ""}` }), open));
+    }
 
     // Where it's up to
     if (np.kind === "vod" && np.duration > 0) {
@@ -2207,9 +2791,14 @@
     // 4. Channels for the match
     const ev = sp.event;
     panel.append(crumb([["Sports", back], [sp.item.name, () => { sp.event = null; sp.channels = null; renderRemote(); }], [`${ev.home} v ${ev.away}`, null]]));
+    const mcBtn = el("button", { class: "btn small", type: "button", text: "Match centre ›" });
+    mcBtn.addEventListener("click", () => openMatchCentre(ev.id, { code: sp.item.code, league: ev.league }));
     panel.append(el("div", { class: "card event-card" },
-      el("div", { class: "title-lg", text: `${ev.home} v ${ev.away}` }),
-      el("div", { class: "sub", text: ev.state === "upcoming" ? `${dayText(ev.kickoff)} · ${timeText(ev.kickoff)}` : `${ev.score || ""} · ${ev.state === "live" ? "Live now" : "Finished"}` })));
+      el("div", { class: "row-actions tight" },
+        el("div", { class: "grow" },
+          el("div", { class: "title-lg", text: `${ev.home} v ${ev.away}` }),
+          el("div", { class: "sub", text: ev.state === "upcoming" ? `${dayText(ev.kickoff)} · ${timeText(ev.kickoff)}` : `${ev.score || ""} · ${ev.state === "live" ? "Live now" : "Finished"}` })),
+        mcBtn)));
     if (!sp.channels) { panel.append(el("p", { class: "empty", text: "Finding the channels showing it…" })); return; }
     if (!sp.channels.length) { panel.append(el("p", { class: "empty", text: "None of their channels are showing this one." })); return; }
     panel.append(el("p", { class: "hint", text: "Best match first, the same list as Watch in their Sports Hub, by playlist." }));
