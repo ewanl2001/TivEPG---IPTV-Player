@@ -1641,9 +1641,15 @@
       c.catchup ? el("span", { class: "catchup-ico", role: "img", title: "Catch-up: can rewind and watch earlier programmes", "aria-label": "Catch-up" }) : null);
   }
 
+  // The row that's on their screen says so ("Playing"), like the app's own lists.
+  function isOnScreen(key) {
+    const np = nowPlaying();
+    return !!(np.active && np.key && np.key === key);
+  }
   function channelRow(c, extra) {
-    const watch = el("button", { class: "btn small btn-white", type: "button", text: "▶ Watch" });
-    watch.addEventListener("click", () => run("playChannel", { server: c.server, channel: c.channel, ...(extra || {}) }, watch));
+    const on = isOnScreen(c.server + "|" + c.channel);
+    const watch = el("button", { class: "btn small " + (on ? "btn-playing" : "btn-white"), type: "button", text: on ? "Playing" : "▶ Watch" });
+    watch.addEventListener("click", () => run("playChannel", { server: c.server, channel: c.channel, ...(extra || {}) }, watch).then(() => setTimeout(pollPlayer, 1500)));
     let progress = null;
     if (c.nowStart && c.nowEnd) {
       const pct = Math.max(0, Math.min(100, ((Date.now() / 1000 - c.nowStart) / (c.nowEnd - c.nowStart)) * 100));
@@ -1732,8 +1738,12 @@
     if (currentTab !== "remote" || document.hidden || remote.scrubbing) return;
     const r = await command("playerState", {});
     if (!r.ok || !r.player) return;
+    const before = (remote.player || {}).active ? remote.player.key : null;
     remote.player = r.player;
     remote.playerAt = Date.now();
+    // Something else went on (or it stopped): the lists' "Playing" moves with it.
+    const after = r.player.active ? r.player.key : null;
+    if (before !== after && !busy("tab-remote") && !remote.scrubbing) { renderRemote(); return; }
     const box = $("np-box");
     const a = document.activeElement;
     if (box && !(a && box.contains(a) && a.tagName === "SELECT")) renderNowPlaying(box);
@@ -2520,8 +2530,9 @@
   }
 
   function playButtons(id, item) {
-    const play = el("button", { class: "btn small btn-white", type: "button",
-      text: item.progress ? "▶ Resume" : "▶ Play" });
+    const on = isOnScreen(id);
+    const play = el("button", { class: "btn small " + (on ? "btn-playing" : "btn-white"), type: "button",
+      text: on ? "Playing" : item.progress ? "▶ Resume" : "▶ Play" });
     play.addEventListener("click", () => run("playVOD", { id }, play).then(() => setTimeout(pollPlayer, 1500)));
     if (!item.progress) return [play];
     const fromStart = el("button", { class: "btn small icon", type: "button", text: "⏮", "aria-label": "Play from the start", title: "Play from the start" });

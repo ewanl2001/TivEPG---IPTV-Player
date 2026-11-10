@@ -700,3 +700,6 @@ button.item.cat-row:hover { border-color: var(--line-2); background: var(--card-
   .home-card.home-wide .home-badge { position: static; }
 }
 .item .sub.wrap-sub { white-space: normal; }
+/* The row on their screen right now */
+.btn.btn-playing { background: rgba(70,194,122,0.16); color: #8fe3b1; border-color: rgba(70,194,122,0.45); }
+.btn.btn-playing::before { content: ""; display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--green); margin-right: 7px; vertical-align: 1px; animation: mc-pulse 2s infinite; }
