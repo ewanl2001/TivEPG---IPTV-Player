@@ -317,18 +317,82 @@
     $("section-bar").hidden = !name;
     $("section-title").textContent = section ? section.title : "";
     for (const panel of document.querySelectorAll(".tab-panel")) panel.hidden = panel.id !== "tab-" + name;
-    if (push) history.pushState({ section: name }, "");
-    if (name === "remote") { remoteMode(remote.mode === "goto" ? "goto" : remote.mode); startPlayerPoll(); }
+    if (push) history.pushState({ section: name, depth: 0 }, "");
+    if (name === "remote") {
+      navRestoring++;
+      try { remoteMode(remote.mode === "goto" ? "goto" : remote.mode); } finally { navRestoring--; }
+      if (push) history.replaceState({ section: "remote", depth: 0, r: navState() }, "");
+      startPlayerPoll();
+    }
     else if (typeof remoteRefreshEvery === "function") { remoteRefreshEvery(0); startPlayerPoll(false); }
+    if (name !== "remote" && $("np-dock")) { $("np-dock").hidden = true; document.body.classList.remove("has-dock"); }
     window.scrollTo({ top: 0 });
     if (!name) renderHome();
     if (name === "selection") renderSelection();
   }
-  $("back").addEventListener("click", () => history.back());
+  $("back").addEventListener("click", () => {
+    if (history.state && history.state.section) history.back(); else showTab(null);
+  });
+  $("home").addEventListener("click", () => { if (currentTab) showTab(null); });
   window.addEventListener("popstate", (e) => {
     if ($("screen-help").hidden) return;
-    showTab(e.state && e.state.section ? e.state.section : null, false);
+    const st = e.state || {};
+    if (st.section === "remote" && st.r) {
+      if (currentTab === "remote") { applyNav(st.r); return; }
+      navRestoring++;
+      try { applyNav(st.r, true); showTab("remote", false); } finally { navRestoring--; }
+      return;
+    }
+    showTab(st.section || null, false);
   });
+
+  // ---------- Remote navigation: every screen is a history entry, so Back retraces your steps ----------
+  let navRestoring = 0;
+  const navKey = (o) => (o ? (o.key || o.id || o.code || o.name || JSON.stringify(o)) + "" : "");
+  function navState() {
+    const r = remote;
+    return { mode: r.mode, gcat: r.guide.category, vcat: r.vod.cat, scat: r.series.cat, show: r.series.show,
+             dest: r.sports.dest, ev: r.sports.event, evCode: r.sports.eventCode,
+             mc: mc.open ? { id: mc.id, code: mc.code, league: mc.league } : null };
+  }
+  function navPush() {
+    if (navRestoring || currentTab !== "remote") return;
+    const r = navState();
+    const cur = history.state || {};
+    if (cur.r && JSON.stringify(cur.r) === JSON.stringify(r)) return;
+    if (cur.section !== "remote") return;
+    history.pushState({ section: "remote", depth: (cur.depth || 0) + 1, r }, "");
+  }
+  function navBack(fallback) {
+    if (history.state && history.state.section === "remote" && history.state.depth > 0) { history.back(); return; }
+    fallback();
+    if (history.state && history.state.section === "remote") history.replaceState({ ...history.state, r: navState() }, "");
+  }
+  function applyNav(r, quiet = false) {
+    navRestoring++;
+    try {
+      const sp = remote.sports, g = remote.guide;
+      if (!r.mc && mc.open) { mc.open = false; clearTimeout(mc.timer); }
+      if (r.mode !== remote.mode) { if (quiet) remote.mode = r.mode; else remoteMode(r.mode); }
+      if (navKey(r.gcat) !== navKey(g.category)) {
+        if (r.gcat) openGuideCategory(r.gcat); else { g.category = null; g.channels = null; remoteRefreshEvery(0); }
+      }
+      for (const [kind, cat] of [["vod", r.vcat], ["series", r.scat]]) {
+        const st = remote[kind];
+        if (navKey(cat) !== navKey(st.cat)) { if (cat) openVodCategory(kind, cat); else { st.cat = null; st.titles = null; } }
+      }
+      if (navKey(r.show) !== navKey(remote.series.show)) {
+        if (r.show) openShow(r.show); else { remote.series.show = null; remote.series.episodes = null; }
+      }
+      if (r.mode === "sports" && r.dest && navKey(r.dest) !== navKey(sp.dest)) hubOpen(r.dest);
+      if (navKey(r.ev) !== navKey(sp.event)) {
+        if (r.ev) openSportsEvent(r.ev, r.evCode); else { sp.event = null; sp.channels = null; }
+      }
+      if (r.mc && !(mc.open && mc.id === r.mc.id)) openMatchCentre(r.mc.id, r.mc);
+      else if (!r.mc && remote.scrollBack != null && !quiet) { renderRemote(); window.scrollTo({ top: remote.scrollBack }); remote.scrollBack = null; }
+      else if (!quiet) renderRemote();
+    } finally { navRestoring--; }
+  }
 
   function cardSummary(id) {
     if (!snapshot) return "";
@@ -1496,6 +1560,7 @@
 
   async function remoteMode(mode) {
     remote.mode = mode;
+    navPush();
     remoteRefreshEvery(0);
     if (mode === "guide") {
       if (remote.guide.category) openGuideCategory(remote.guide.category, false);
@@ -1516,7 +1581,7 @@
 
   async function openGuideCategory(cat, follow = true) {
     remote.guide.category = cat;
-    if (follow) remote.guide.channels = null;
+    if (follow) { remote.guide.channels = null; navPush(); }
     renderRemote();
     const load = async () => {
       const r = await command("guideChannels", { key: cat.key });
@@ -1596,7 +1661,8 @@
 
   // Results from several playlists: one titled block per playlist (in the order they first
   // come), like the app's own sections. One playlist: just the list.
-  function bySource(rows, makeRow, listClass = "list") {
+  const collapsedSources = new Set();
+  function bySource(rows, makeRow, listClass = "list", collapsible = false) {
     const order = [], groups = new Map();
     for (const r of rows) {
       const k = r.source || "";
@@ -1604,6 +1670,21 @@
       groups.get(k).push(r);
     }
     if (order.length <= 1) return [el("div", { class: listClass }, rows.map(makeRow))];
+    if (collapsible) return order.map((k) => {
+      const shut = collapsedSources.has(k);
+      const head = el("button", { class: "source-head source-toggle", type: "button", "aria-expanded": String(!shut) },
+        el("span", { class: "source-name", text: k || "Other" }),
+        el("span", { class: "subtab-badge", text: String(groups.get(k).length) }),
+        el("span", { class: "source-chev", text: "›" }));
+      const body = el("div", { class: listClass }, groups.get(k).map(makeRow));
+      const sec = el("section", { class: "source-group" + (shut ? " collapsed" : "") }, head, body);
+      head.addEventListener("click", () => {
+        const now = !sec.classList.toggle("collapsed");
+        if (now) collapsedSources.delete(k); else collapsedSources.add(k);
+        head.setAttribute("aria-expanded", String(now));
+      });
+      return sec;
+    });
     return order.map((k) => el("section", { class: "source-group" },
       el("div", { class: "source-head" },
         el("span", { class: "source-name", text: k || "Other" }),
@@ -1652,9 +1733,7 @@
 
     // On their screen now, with the player's controls while something plays.
     const np = nowPlaying();
-    const npBox = el("div", { id: "np-box" });
-    panel.append(npBox);
-    renderNowPlaying(npBox);
+    renderNowPlaying(ensureDock());
 
     const modes = el("div", { class: "subtabs remote-modes" },
       pill("📺 Guide", null, remote.mode === "guide", () => remoteMode("guide")),
@@ -1752,6 +1831,7 @@
     Object.assign(mc, { open: true, id, code: opts.code || null, league: opts.league || null, data: null, table: null,
                         synced: false, delay: null, tab: null, pickedTab: false, lineupSide: "home", innings: null, groupsAll: false, error: null });
     remote.scrollBack = window.scrollY;
+    navPush();
     renderRemote();
     window.scrollTo({ top: 0 });
     loadMatchCentre(true);
@@ -1870,7 +1950,7 @@
 
   // ----- the screen -----
   function renderMatchCentre(panel) {
-    panel.append(crumb([["Remote", closeMatchCentre], ["Match centre", null]]));
+    panel.append(crumb([["Remote", () => navBack(closeMatchCentre)], ["Match centre", null]]));
     const f = mc.data;
     if (!f) {
       panel.append(el("p", { class: "empty", text: mc.error || "Loading the match…" }));
@@ -2327,16 +2407,58 @@
     return wrap;
   }
 
+  // Apple Music-style: a mini player docked at the bottom, tap to open the full controls sheet.
+  function ensureDock() {
+    let dock = $("np-dock");
+    if (!dock) {
+      const close = () => dock.classList.remove("open");
+      const scrim = el("div", { class: "np-scrim" });
+      scrim.addEventListener("click", close);
+      const grab = el("button", { class: "np-grab", type: "button", "aria-label": "Close controls" }, el("span"));
+      grab.addEventListener("click", close);
+      dock = el("div", { id: "np-dock", hidden: "" }, scrim,
+        el("div", { class: "np-sheet" }, grab, el("div", { id: "np-box" })),
+        el("div", { class: "np-mini", id: "np-mini" }));
+      document.body.append(dock);
+      document.addEventListener("keydown", (e) => { if (e.key === "Escape") close(); });
+    }
+    return $("np-box");
+  }
+  function renderMini(np) {
+    const mini = $("np-mini");
+    if (!mini) return;
+    mini.replaceChildren();
+    const kind = np.kind === "vod" ? "🎬" : np.fixture ? "🏆" : "📺";
+    const info = el("button", { class: "np-mini-info", type: "button", "aria-label": "Open the player controls" },
+      el("span", { class: "np-mini-art", text: kind }),
+      el("span", { class: "grow" },
+        el("span", { class: "np-mini-title", text: np.name || "Playing" }),
+        el("span", { class: "np-mini-sub" },
+          np.kind === "live" ? el("span", { class: "live-dot", text: "LIVE" }) : null,
+          " " + (np.fixture ? np.fixture + (np.score ? "  " + np.score : "") : np.now || (np.kind === "timeshift" ? "Catch-up" : np.fullScreen ? "Full screen" : "In the app")))));
+    info.addEventListener("click", () => $("np-dock").classList.add("open"));
+    const stop = el("button", { class: "np-mini-btn", type: "button", "aria-label": "Stop", text: "■" });
+    stop.addEventListener("click", () => run("stopPlayback", {}, stop).then(() => setTimeout(pollPlayer, 500)));
+    mini.append(info, ctl(np.paused ? "▶" : "❚❚", np.paused ? "Play" : "Pause", { action: "playPause" }, "np-mini-btn"), stop);
+    if (np.kind === "vod" && np.duration > 0) {
+      const bar = el("span", { class: "np-mini-prog" }); bar.style.width = (np.position / np.duration * 100) + "%"; mini.append(bar);
+    } else if (np.nowStart && np.nowEnd) {
+      const bar = el("span", { class: "np-mini-prog" });
+      bar.style.width = Math.max(0, Math.min(100, ((Date.now() / 1000 - np.nowStart) / (np.nowEnd - np.nowStart)) * 100)) + "%"; mini.append(bar);
+    }
+  }
+
   function renderNowPlaying(box) {
     const np = nowPlaying();
     box.replaceChildren();
+    const dock = $("np-dock");
+    const show = !!np.active && currentTab === "remote";
+    if (dock) { dock.hidden = !show; if (!show) dock.classList.remove("open"); }
+    document.body.classList.toggle("has-dock", show);
+    if (!np.active) return;
+    renderMini(np);
     const card = el("div", { class: "card now-playing" }, el("div", { class: "sub", text: "ON THEIR SCREEN NOW" }));
     box.append(card);
-    if (!np.active) {
-      card.append(el("div", { class: "title-lg", text: "Nothing playing" }),
-        snapshot.currentTab ? el("div", { class: "sub", text: `On the ${snapshot.currentTab} tab. Pick something below and press Watch.` }) : null);
-      return;
-    }
     const stop = el("button", { class: "btn small danger", type: "button", text: "Stop" });
     stop.addEventListener("click", () => run("stopPlayback", {}, stop).then(() => setTimeout(pollPlayer, 500)));
     const where = np.fullScreen ? "Full screen" : `In the ${snapshot.currentTab || "app"}`;
@@ -2456,6 +2578,7 @@
   async function openVodCategory(kind, cat) {
     const st = remote[kind];
     Object.assign(st, { cat, titles: null, more: false, show: null, episodes: null, filter: "" });
+    navPush();
     renderRemote();
     const r = await command("vodTitles", { kind, key: cat.key, offset: 0 });
     if (st.cat !== cat) return;
@@ -2493,6 +2616,7 @@
   async function openShow(show) {
     const st = remote.series;
     Object.assign(st, { show, episodes: null, season: null });
+    navPush();
     renderRemote();
     const r = await command("seriesEpisodes", { id: show.id });
     if (st.show !== show) return;
@@ -2536,7 +2660,7 @@
     // Episodes of one series
     if (kind === "series" && st.show) {
       const back = searching ? "Search" : st.cat ? st.cat.name : "Series";
-      panel.append(crumb([[back, () => { st.show = null; st.episodes = null; renderRemote(); }], [st.show.name, null]]));
+      panel.append(crumb([[back, () => navBack(() => { st.show = null; st.episodes = null; renderRemote(); })], [st.show.name, null]]));
       panel.append(el("div", { class: "card show-head" }, art(st.cover || st.show.image, "poster", st.show.name),
         el("div", { class: "grow" }, el("div", { class: "title-lg", text: st.show.name }),
           el("div", { class: "sub", text: [st.show.category, st.show.year, st.show.source].filter(Boolean).join(" · ") }))));
@@ -2588,7 +2712,7 @@
     if (searching) {
       panel.append(search);
     } else {
-      panel.append(crumb([[tabName, () => { st.cat = null; st.titles = null; renderRemote(); }], [st.cat.name, null]]));
+      panel.append(crumb([[tabName, () => navBack(() => { st.cat = null; st.titles = null; renderRemote(); })], [st.cat.name, null]]));
     }
     if (!st.titles) { panel.append(el("p", { class: "empty", text: searching ? "Searching…" : "Loading…" })); return; }
     if (!st.titles.length) { panel.append(el("p", { class: "empty", text: searching ? "Nothing matches." : "Nothing in this category." })); return; }
@@ -2686,7 +2810,7 @@
       return;
     }
 
-    panel.append(crumb([["Categories", () => { g.category = null; g.channels = null; remoteRefreshEvery(0); renderRemote(); }], [g.category.name, null]]));
+    panel.append(crumb([["Categories", () => navBack(() => { g.category = null; g.channels = null; remoteRefreshEvery(0); renderRemote(); })], [g.category.name, null]]));
     if (!g.channels) { panel.append(el("p", { class: "empty", text: "Loading channels and what's on…" })); return; }
     panel.append(filterBox("Find a channel or programme"));
     const q = g.filter.trim().toLowerCase();
@@ -2771,6 +2895,7 @@
     sp.event = null;
     sp.channels = null;
     sp.picker = false;
+    navPush();
     if (changed) {
       sp.events = null; sp.table = null; sp.tableTried = false; sp.filter = "All";
       if (dest.code === "UPCOMING" || sp.view === "table") sp.view = "fixtures";
@@ -2804,6 +2929,7 @@
     sp.event = ev;
     sp.eventCode = code || (sp.dest || UPCOMING_DEST).code;
     sp.channels = null;
+    navPush();
     renderRemote();
     window.scrollTo({ top: 0, behavior: "smooth" });
     const r = await command("hubEventChannels", { code: sp.eventCode, fixture: ev.id });
@@ -3108,7 +3234,7 @@
     const ev = sp.event;
     const dest = sp.dest || UPCOMING_DEST;
     const back = el("button", { class: "hub-back", type: "button", text: "‹ " + (dest.label || dest.name) });
-    back.addEventListener("click", () => { sp.event = null; sp.channels = null; renderRemote(); });
+    back.addEventListener("click", () => navBack(() => { sp.event = null; sp.channels = null; renderRemote(); }));
     const live = ev.state === "live", done = ev.state === "finished";
     const lead = hubLead(ev), trail = hubTrail(ev);
     const [a, b] = hubScores(ev);
@@ -3131,7 +3257,7 @@
     if (!sp.channels) { watch.append(hubEmpty("Finding the channels showing it…")); return; }
     if (!sp.channels.length) { watch.append(hubEmpty("None of their channels are showing this one.")); return; }
     watch.append(el("p", { class: "hint", text: "Best match first, the same list as Watch in their Sports Hub. It plays full screen on their TV." }));
-    watch.append(...bySource(sp.channels, (c) => channelRow(c, { fixture: ev.id, code: sp.eventCode || dest.code })));
+    watch.append(...bySource(sp.channels, (c) => channelRow(c, { fixture: ev.id, code: sp.eventCode || dest.code }), "list", true));
   }
 
   // ----- Table -----
