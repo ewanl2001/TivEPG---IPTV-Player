@@ -1145,3 +1145,19 @@ body.has-dock { padding-bottom: 96px; }
 .hl-player-box { position: relative; width: min(1100px, 100%); aspect-ratio: 16 / 9; }
 .hl-player { width: 100%; height: 100%; border: 0; border-radius: 14px; background: #000; }
 .hl-player-x { position: absolute; top: -44px; right: 0; }
+
+/* Guide on a big screen: use the width, not the 900px column. */
+body.wide-guide main { max-width: min(1680px, 100%); padding-left: 28px; padding-right: 28px; }
+body.wide-guide .epg-grid { max-height: calc(100vh - 210px); }
+
+/* Guide on a phone: channel list with now and next; long names wrap instead of vanishing. */
+.guide-list .item.chan { align-items: flex-start; padding-top: 12px; padding-bottom: 12px; }
+.guide-list .item.chan .art-logo { width: 46px; height: 46px; flex: none; margin-top: 2px; }
+.guide-list .item .title.chan-name { white-space: normal; }
+.guide-list .chan-text { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; word-break: break-word; font-size: 15px; line-height: 1.25; }
+.guide-list .now-line { margin-top: 3px; line-height: 1.3; white-space: normal; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.guide-list .now-line .sub { display: inline; white-space: nowrap; }
+@media (max-width: 699px) { .guide-list .item.chan > .btn.small { padding: 0 12px; height: 36px; font-size: 13px; } }
+.guide-list .item .sub { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.guide-list .prog { max-width: none; }
+.guide-list .item.chan > .btn { flex: none; align-self: center; }

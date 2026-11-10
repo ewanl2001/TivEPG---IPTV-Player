@@ -329,6 +329,7 @@
       startPlayerPoll();
     }
     else if (typeof remoteRefreshEvery === "function") { remoteRefreshEvery(0); startPlayerPoll(false); }
+    if (name !== "remote") document.body.classList.remove("wide-guide");
     if (name !== "remote" && $("np-dock")) { $("np-dock").hidden = true; document.body.classList.remove("has-dock"); }
     window.scrollTo({ top: 0 });
     if (!name) renderHome();
@@ -1733,6 +1734,7 @@
 
   function renderRemote() {
     const panel = $("tab-remote");
+    document.body.classList.toggle("wide-guide", currentTab === "remote" && remote.mode === "guide" && !mc.open && guideIsGrid());
     const keepFocus = document.activeElement && document.activeElement.dataset.remotefilter;
     panel.replaceChildren();
     if (mc.open) { renderMatchCentre(panel); return; }
@@ -2800,6 +2802,11 @@
     const from = Math.floor(now / 1800) * 1800 - 1800;     // the half hour before the last one
     return { from, to: from + GUIDE_HOURS * 3600 };
   }
+  const guideMQ = window.matchMedia("(min-width: 700px)");
+  const guideIsGrid = () => guideMQ.matches;
+  guideMQ.addEventListener("change", () => {
+    if (currentTab === "remote" && remote.mode === "guide" && !mc.open && !busy("tab-remote")) renderRemote();
+  });
   const guidePxPerMin = () => (window.matchMedia("(min-width: 900px)").matches ? 7 : 4.5);
 
   function guideCategoriesFlat(g) {
@@ -2852,9 +2859,12 @@
     // The picked programme: title, time, channel and Watch.
     if (g.picked) shell.append(guidePickedCard(g.picked));
 
-    if (!g.channels) { shell.append(el("div", { class: "epg-grid loading" }, el("p", { class: "empty", text: "Loading channels and what's on…" }))); return; }
+    if (!g.channels) { shell.append(el("div", { class: guideIsGrid() ? "epg-grid loading" : "", }, el("p", { class: "empty", text: "Loading channels and what's on…" }))); return; }
     if (!g.channels.length) { shell.append(el("p", { class: "empty", text: "No channels in this category." })); return; }
-    shell.append(guideGrid(g));
+    // Big screens (iPad, computer): the TV guide grid. Phones: a list with now and next,
+    // channel names allowed to wrap so long ones stay readable.
+    if (guideIsGrid()) shell.append(guideGrid(g));
+    else shell.append(el("div", { class: "list guide-list" }, g.channels.map((c) => channelRow(c))));
   }
 
   function guidePickedCard(p) {
