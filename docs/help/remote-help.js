@@ -1403,6 +1403,9 @@
     mode: "guide",
     guide: { groups: null, open: new Set(["pinned"]), category: null, channels: null, filter: "" },
     sports: { group: null, item: null, events: null, event: null, channels: null },
+    // Movies and Series: categories in their tab's order, then titles, then (series) episodes.
+    vod: { cats: null, cat: null, titles: null, more: false, query: "", searching: false, filter: "" },
+    series: { cats: null, cat: null, titles: null, more: false, query: "", searching: false, filter: "", show: null, episodes: null, season: null },
     timer: null,
   };
   const timeText = (t) => new Date(t * 1000).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
@@ -1425,6 +1428,8 @@
       else loadGuideGroups();
     } else if (mode === "sports") {
       if (remote.sports.item) openSportsItem(remote.sports.item);
+    } else if (mode === "vod" || mode === "series") {
+      if (!remote[mode].cats) loadVodCategories(mode);
     }
     renderRemote();
   }
@@ -1524,6 +1529,8 @@
     const modes = el("div", { class: "subtabs remote-modes" },
       pill("📺 Guide", null, remote.mode === "guide", () => remoteMode("guide")),
       pill("🏆 Sports Hub", null, remote.mode === "sports", () => remoteMode("sports")),
+      tabOn("Movies") ? pill("🎬 Movies", null, remote.mode === "vod", () => remoteMode("vod")) : null,
+      tabOn("Series") ? pill("🎞️ Series", null, remote.mode === "series", () => remoteMode("series")) : null,
       pill("Tabs", null, remote.mode === "goto", () => remoteMode("goto")));
     panel.append(modes);
 
@@ -1553,6 +1560,7 @@
     }
 
     if (remote.mode === "guide") renderRemoteGuide(panel);
+    else if (remote.mode === "vod" || remote.mode === "series") renderRemoteVod(panel, remote.mode);
     else renderRemoteSports(panel);
 
     if (keepFocus) {
@@ -1706,6 +1714,167 @@
     restart.addEventListener("click", () => control({ action: "restart" }, restart));
     opts.append(el("div", { class: "row-actions tight" }, restart));
     card.append(opts);
+  }
+
+  // ---------- Movies and Series ----------
+  const tabOn = (name) => !snapshot.tabs || snapshot.tabs.includes(name);
+
+  async function loadVodCategories(kind) {
+    const r = await command("vodCategories", { kind });
+    remote[kind].cats = r.ok ? r.categories : [];
+    if (remote.mode === kind) renderRemote();
+  }
+
+  async function openVodCategory(kind, cat) {
+    const st = remote[kind];
+    Object.assign(st, { cat, titles: null, more: false, show: null, episodes: null, filter: "" });
+    renderRemote();
+    const r = await command("vodTitles", { kind, key: cat.key, offset: 0 });
+    if (st.cat !== cat) return;
+    st.titles = r.ok ? r.titles : [];
+    st.more = !!(r.ok && r.more);
+    renderRemote();
+  }
+
+  async function loadMoreTitles(kind, button) {
+    const st = remote[kind];
+    const cat = st.cat;
+    button.disabled = true;
+    const r = await command("vodTitles", { kind, key: cat.key, offset: st.titles.length });
+    if (st.cat !== cat || !r.ok) return;
+    st.titles = st.titles.concat(r.titles);
+    st.more = !!r.more;
+    renderRemote();
+  }
+
+  let vodSearchTimer = null;
+  function searchVod(kind, query) {
+    const st = remote[kind];
+    st.query = query;
+    clearTimeout(vodSearchTimer);
+    if (query.trim().length < 2) { st.searching = false; st.titles = st.cat ? st.titles : null; renderRemote(); return; }
+    vodSearchTimer = setTimeout(async () => {
+      st.searching = true;
+      const r = await command("vodTitles", { kind, query: query.trim() });
+      if (st.query !== query) return;
+      Object.assign(st, { cat: null, titles: r.ok ? r.titles : [], more: false, show: null, episodes: null });
+      renderRemote(); // keeps the search box focused
+    }, 450);
+  }
+
+  async function openShow(show) {
+    const st = remote.series;
+    Object.assign(st, { show, episodes: null, season: null });
+    renderRemote();
+    const r = await command("seriesEpisodes", { id: show.id });
+    if (st.show !== show) return;
+    st.episodes = r.ok ? r.episodes : [];
+    if (!r.ok) toast(r.message || "Couldn't load the episodes.", true);
+    // Open on the season they're part-way through, else the first.
+    const watching = st.episodes.find((e) => e.progress && e.progress < 0.95);
+    st.season = watching ? watching.season : (st.episodes[0] || {}).season;
+    renderRemote();
+  }
+
+  function playButtons(id, item) {
+    const play = el("button", { class: "btn small btn-white", type: "button",
+      text: item.progress ? "▶ Resume" : "▶ Play" });
+    play.addEventListener("click", () => run("playVOD", { id }, play).then(() => setTimeout(pollPlayer, 1500)));
+    if (!item.progress) return [play];
+    const fromStart = el("button", { class: "btn small icon", type: "button", text: "⏮", "aria-label": "Play from the start", title: "Play from the start" });
+    fromStart.addEventListener("click", () => run("playVOD", { id, fromStart: true }, fromStart).then(() => setTimeout(pollPlayer, 1500)));
+    return [fromStart, play];
+  }
+
+  function progressBar(p) {
+    if (!p) return null;
+    const bar = el("span", { class: "prog-fill" });
+    bar.style.width = Math.round(p * 100) + "%";
+    return el("span", { class: "prog" }, bar);
+  }
+
+  function renderRemoteVod(panel, kind) {
+    const st = remote[kind];
+    const word = kind === "vod" ? "film" : "series";
+    const tabName = kind === "vod" ? "Movies" : "Series";
+
+    const search = el("input", { class: "search", placeholder: kind === "vod" ? "Search all their films" : "Search all their series", value: st.query });
+    search.dataset.remotefilter = "1";
+    search.addEventListener("input", () => searchVod(kind, search.value));
+    const searching = st.query.trim().length >= 2;
+
+    // Episodes of one series
+    if (kind === "series" && st.show) {
+      const back = searching ? "Search" : st.cat ? st.cat.name : "Series";
+      panel.append(crumb([[back, () => { st.show = null; st.episodes = null; renderRemote(); }], [st.show.name, null]]));
+      if (!st.episodes) { panel.append(el("p", { class: "empty", text: "Loading episodes…" })); return; }
+      if (!st.episodes.length) { panel.append(el("p", { class: "empty", text: "Their provider didn't list any episodes for this one." })); return; }
+      const seasons = [...new Set(st.episodes.map((e) => e.season))];
+      if (seasons.length > 1) {
+        panel.append(el("div", { class: "subtabs" }, seasons.map((n) =>
+          pill(n ? `Season ${n}` : "Episodes", null, st.season === n, () => { st.season = n; renderRemote(); }))));
+      }
+      const list = el("div", { class: "list" });
+      for (const ep of st.episodes.filter((e) => seasons.length <= 1 || e.season === st.season)) {
+        list.append(el("div", { class: "item chan" },
+          el("div", { class: "grow" },
+            el("div", { class: "title", text: ep.episode ? `${ep.episode}. ${ep.title}` : ep.title }),
+            progressBar(ep.progress)),
+          ...playButtons(ep.id, ep)));
+      }
+      panel.append(list);
+      return;
+    }
+
+    // Categories
+    if (!st.cat && !searching) {
+      panel.append(el("p", { class: "hint", text: `Their ${tabName} rows, in the same order. Browsing here doesn't change their screen; Play puts it on full screen.` }));
+      panel.append(search);
+      if (!st.cats) { panel.append(el("p", { class: "empty", text: "Loading…" })); return; }
+      if (!st.cats.length) { panel.append(el("p", { class: "empty", text: `No ${word} categories are switched on.` })); return; }
+      const many = new Set(st.cats.map((c) => c.source)).size > 1;
+      const list = el("div", { class: "list" });
+      for (const c of st.cats) {
+        const row = el("button", { class: "item cat-row", type: "button" },
+          el("div", { class: "grow" }, el("div", { class: "title", text: c.name }),
+            !c.browsable ? el("div", { class: "sub", text: "Open this one on their device" }) : many ? el("div", { class: "sub", text: c.source }) : null),
+          c.browsable ? el("span", { class: "chev", text: "›" }) : null);
+        row.disabled = !c.browsable;
+        if (c.browsable) row.addEventListener("click", () => openVodCategory(kind, c));
+        list.append(row);
+      }
+      panel.append(list);
+      return;
+    }
+
+    // Titles (a category, or search results)
+    if (searching) {
+      panel.append(search);
+    } else {
+      panel.append(crumb([[tabName, () => { st.cat = null; st.titles = null; renderRemote(); }], [st.cat.name, null]]));
+    }
+    if (!st.titles) { panel.append(el("p", { class: "empty", text: searching ? "Searching…" : "Loading…" })); return; }
+    if (!st.titles.length) { panel.append(el("p", { class: "empty", text: searching ? "Nothing matches." : "Nothing in this category." })); return; }
+    const list = el("div", { class: "list" });
+    for (const t of st.titles) {
+      const info = el("div", { class: "grow" },
+        el("div", { class: "title", text: t.name }),
+        t.year || t.resume ? el("div", { class: "sub", text: [t.year, t.resume ? `stopped at ${fmtTime(t.resume)}` : ""].filter(Boolean).join(" · ") }) : null,
+        progressBar(t.progress));
+      if (kind === "series") {
+        const row = el("button", { class: "item cat-row", type: "button" }, info, el("span", { class: "chev", text: "›" }));
+        row.addEventListener("click", () => openShow(t));
+        list.append(row);
+      } else {
+        list.append(el("div", { class: "item chan" }, info, ...playButtons(t.id, t)));
+      }
+    }
+    panel.append(list);
+    if (st.more) {
+      const more = el("button", { class: "btn", type: "button", text: "Show more" });
+      more.addEventListener("click", () => loadMoreTitles(kind, more));
+      panel.append(el("div", { class: "row-actions center-row" }, more));
+    }
   }
 
   function filterBox(placeholder) {

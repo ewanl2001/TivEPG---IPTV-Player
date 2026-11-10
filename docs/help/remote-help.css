@@ -467,3 +467,5 @@ button.item.cat-row:hover { border-color: var(--line-2); background: var(--card-
 .now-playing .np-row { flex-wrap: nowrap; }
 .now-playing .sub { font-size: 14px; color: var(--text-2, #A9B3C1); }
 .opt-row .sub { font-size: 13px; margin-top: 2px; }
+.center-row { justify-content: center; margin-top: 12px; }
+.item.cat-row:disabled { opacity: .6; cursor: default; }
