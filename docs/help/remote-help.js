@@ -1584,7 +1584,9 @@
     if (follow) { remote.guide.channels = null; navPush(); }
     renderRemote();
     const load = async () => {
-      const r = await command("guideChannels", { key: cat.key });
+      const w = guideWindow();
+      remote.guide.window = w;
+      const r = await command("guideChannels", { key: cat.key, from: w.from, to: w.to });
       if (remote.guide.category && remote.guide.category.key === cat.key) {
         remote.guide.channels = r.ok ? r.channels : [];
         if (!busy("tab-remote")) renderRemote();
@@ -2430,7 +2432,7 @@
     mini.replaceChildren();
     const kind = np.kind === "vod" ? "🎬" : np.fixture ? "🏆" : "📺";
     const info = el("button", { class: "np-mini-info", type: "button", "aria-label": "Open the player controls" },
-      el("span", { class: "np-mini-art", text: kind }),
+      np.image ? art(np.image, np.kind === "vod" ? "poster" : "logo", np.name) : el("span", { class: "np-mini-art", text: kind }),
       el("span", { class: "grow" },
         el("span", { class: "np-mini-title", text: np.name || "Playing" }),
         el("span", { class: "np-mini-sub" },
@@ -2746,8 +2748,8 @@
     f.addEventListener("input", () => {
       const g = remote.guide;
       g.filter = f.value;
-      // On the category list the box also searches every channel on their device.
-      if (!g.category) {
+      // The box searches every channel on their device, as the guide's own search.
+      {
         clearTimeout(g.searchTimer);
         const q = f.value.trim().toLowerCase();
         if (q.length >= 2 && q !== g.searchFor) {
@@ -2756,7 +2758,7 @@
             if (remote.guide.filter.trim().toLowerCase() !== q) return;
             g.searchFor = q;
             g.search = r.ok ? { channels: r.channels || [], more: !!r.more } : { error: r.message || "Couldn't search their channels." };
-            if (currentTab === "remote" && remote.mode === "guide" && !g.category) renderRemote();
+            if (currentTab === "remote" && remote.mode === "guide") renderRemote();
           }, 350);
         }
       }
@@ -2765,60 +2767,188 @@
     return f;
   }
 
+  // ---------- Guide: the Apple TV guide, without its player ----------
+  // Category pills across the top (the drawer's categories, in their order), then the grid:
+  // channel column on the left, half-hour time header, programme cells laid out by time, the
+  // "on now" card in the guide's accent and a now-line. Scrolls both ways. Wears their guide
+  // theme. Browsing never changes their screen; a programme's Watch puts the channel on.
+  const EPG_THEMES = {
+    midnight: ["#232B3D", "#161B29", "#161922", "#0D0F16", "#298FFF", "#0F61F5", "#0D42D1", "#4DCCFF", "#0D1426", "#141F33"],
+    midnightDeep: ["#1A2138", "#0F1424", "#141930", "#0A0D1A", "#4C6FFF", "#3454E8", "#2138B8", "#8FA5FF", "#080B18", "#111730"],
+    blackout: ["#0A0A0B", "#050506", "#060607", "#020203", "#2E3137", "#22252A", "#17191D", "#E9ECF0", "#000000", "#0A0A0C"],
+    night: ["#2A2420", "#1C1815", "#1E1A17", "#141110", "#8A5F2E", "#6E4A22", "#52361A", "#C0925A", "#141110", "#1F1A16"],
+    slate: ["#414247", "#2C2D31", "#313236", "#202124", "#7A7F87", "#656A72", "#52565D", "#DADDE2", "#26272B", "#33343A"],
+    obsidian: ["#1E1F22", "#131416", "#17181A", "#0E0F10", "#4A505A", "#3A3F47", "#2C3037", "#8A939D", "#0E0F11", "#191A1D"],
+    onyxAmber: ["#221F1B", "#141210", "#191714", "#0E0D0B", "#D9932F", "#B8761E", "#8F5A14", "#E8B45E", "#0D0B09", "#181512"],
+    deepTeal: ["#17262B", "#0D181C", "#111C20", "#091214", "#2FB6C4", "#1E8E9C", "#146A76", "#5FD3DE", "#081316", "#0F2126"],
+    forest: ["#1E2A22", "#121A15", "#16201A", "#0C120F", "#4E8F63", "#3B7150", "#2A533A", "#8FC9A1", "#0A120D", "#131F17"],
+    aubergine: ["#241C2E", "#15101C", "#1B1522", "#0F0B15", "#B067A8", "#8C4E85", "#693A64", "#C98BC2", "#0E0A14", "#1A1424"],
+  };
+  function applyEPGTheme(node) {
+    const t = EPG_THEMES[hubSetting("epgTheme", "midnight")] || EPG_THEMES.midnight;
+    const names = ["surf1", "surf2", "end1", "end2", "live1", "live2", "live3", "accent", "head1", "head2"];
+    names.forEach((n, i) => node.style.setProperty("--e-" + n, t[i]));
+    return node;
+  }
+  const GUIDE_HOURS = 8;
+  function guideWindow() {
+    const now = Date.now() / 1000;
+    const from = Math.floor(now / 1800) * 1800 - 1800;     // the half hour before the last one
+    return { from, to: from + GUIDE_HOURS * 3600 };
+  }
+  const guidePxPerMin = () => (window.matchMedia("(min-width: 900px)").matches ? 7 : 4.5);
+
+  function guideCategoriesFlat(g) {
+    const out = [], seen = new Set();
+    for (const grp of g.groups || []) for (const c of grp.items) if (!seen.has(c.key)) { seen.add(c.key); out.push(c); }
+    return out;
+  }
+
   function renderRemoteGuide(panel) {
     const g = remote.guide;
+    if (!g.groups) { panel.append(el("p", { class: "empty", text: "Loading their guide…" })); if (g.groups === null) loadGuideGroups(); g.groups = g.groups || undefined; return; }
+    const cats = guideCategoriesFlat(g);
+    if (!cats.length) { panel.append(el("p", { class: "empty", text: "No TV channel categories are switched on." })); return; }
+    // Opens on their first category, as the guide does.
     if (!g.category) {
-      if (!g.groups) { panel.append(el("p", { class: "empty", text: "Loading their guide…" })); if (g.groups === null) loadGuideGroups(); g.groups = g.groups || undefined; return; }
-      panel.append(el("p", { class: "hint", text: "Search every channel, or open one of their guide's categories (same order as their TV). Browsing here doesn't change their screen; Watch puts a channel on." }));
-      panel.append(filterBox("Search all channels"));
-      const q = g.filter.trim().toLowerCase();
-      if (q.length >= 2) {
-        // Every live channel on their switched-on playlists, then the categories that match.
-        panel.append(el("h4", { class: "hub-section", text: "Channels" }));
-        const list = el("div", { class: "list" });
-        const res = g.searchFor === q ? g.search : null;
-        if (!res) list.append(el("p", { class: "empty", text: "Searching their channels…" }));
-        else if (res.error) list.append(el("p", { class: "empty", text: res.error }));
-        else if (!res.channels.length) list.append(el("p", { class: "empty", text: "No channels match." }));
-        else list.append(...bySource(res.channels, (c) => channelRow(c), "group-stack"));
-        if (res && res.more) list.append(el("p", { class: "hint", text: "Showing the first 80. Type more of the name to narrow it down." }));
-        panel.append(list);
-        if (g.groups.some((grp) => grp.items.some((c) => c.name.toLowerCase().includes(q)))) {
-          panel.append(el("h4", { class: "hub-section", text: "Categories" }));
-        }
-      }
-      if (!g.groups.length) panel.append(el("p", { class: "empty", text: "No TV channel categories are switched on." }));
-      for (const grp of g.groups) {
-        const items = grp.items.filter((c) => !q || c.name.toLowerCase().includes(q));
-        if (q && !items.length) continue;
-        const open = q || g.open.has(grp.id);
-        const head = el("button", { class: "group-head" + (open ? " open" : ""), type: "button" },
-          el("span", { class: "chev" + (open ? " open" : ""), text: "›" }),
-          el("span", { class: "grow group-title", text: grp.title }),
-          el("span", { class: "subtab-badge", text: String(items.length) }));
-        head.addEventListener("click", () => { g.open.has(grp.id) ? g.open.delete(grp.id) : g.open.add(grp.id); renderRemote(); });
-        panel.append(head);
-        if (!open) continue;
-        const list = el("div", { class: "list group-list" });
-        for (const c of items) {
-          const row = el("button", { class: "item cat-row", type: "button" }, el("span", { class: "grow title", text: c.name }), el("span", { class: "chev", text: "›" }));
-          row.addEventListener("click", () => { g.filter = ""; g.search = null; g.searchFor = ""; openGuideCategory(c); });
-          list.append(row);
-        }
-        panel.append(list);
-      }
+      panel.append(el("p", { class: "empty", text: "Loading their guide…" }));
+      g.channels = null;
+      setTimeout(() => { if (!g.category) openGuideCategory(cats[0], false); }, 0);
       return;
     }
 
-    panel.append(crumb([["Categories", () => navBack(() => { g.category = null; g.channels = null; remoteRefreshEvery(0); renderRemote(); })], [g.category.name, null]]));
-    if (!g.channels) { panel.append(el("p", { class: "empty", text: "Loading channels and what's on…" })); return; }
-    panel.append(filterBox("Find a channel or programme"));
+    const shell = applyEPGTheme(el("div", { class: "epg" }));
+    panel.append(shell);
+    shell.append(filterBox("Search all channels"));
+
     const q = g.filter.trim().toLowerCase();
-    const list = el("div", { class: "list" });
-    const rows = g.channels.filter((c) => !q || c.name.toLowerCase().includes(q) || (c.now || "").toLowerCase().includes(q));
-    if (!rows.length) list.append(el("p", { class: "empty", text: q ? "Nothing matches." : "No channels in this category." }));
-    else list.append(...bySource(rows, (c) => channelRow(c), "group-stack"));
-    panel.append(list);
+    if (q.length >= 2) {
+      const list = el("div", { class: "list" });
+      const res = g.searchFor === q ? g.search : null;
+      if (!res) list.append(el("p", { class: "empty", text: "Searching their channels…" }));
+      else if (res.error) list.append(el("p", { class: "empty", text: res.error }));
+      else if (!res.channels.length) list.append(el("p", { class: "empty", text: "No channels match." }));
+      else list.append(...bySource(res.channels, (c) => channelRow(c), "group-stack"));
+      if (res && res.more) list.append(el("p", { class: "hint", text: "Showing the first 80. Type more of the name to narrow it down." }));
+      shell.append(list);
+      return;
+    }
+
+    // Category pills.
+    const pills = el("div", { class: "epg-pills", role: "tablist" });
+    for (const c of cats) {
+      const on = c.key === g.category.key;
+      const b = el("button", { class: "epg-pill" + (on ? " on" : ""), type: "button", role: "tab", "aria-selected": on ? "true" : "false", text: c.name });
+      b.addEventListener("click", () => { if (!on) { g.scroll = null; g.picked = null; openGuideCategory(c); } });
+      pills.append(b);
+    }
+    shell.append(pills);
+    requestAnimationFrame(() => { const on = pills.querySelector(".on"); if (on) pills.scrollLeft = on.offsetLeft - pills.clientWidth / 2 + on.clientWidth / 2; });
+
+    // The picked programme: title, time, channel and Watch.
+    if (g.picked) shell.append(guidePickedCard(g.picked));
+
+    if (!g.channels) { shell.append(el("div", { class: "epg-grid loading" }, el("p", { class: "empty", text: "Loading channels and what's on…" }))); return; }
+    if (!g.channels.length) { shell.append(el("p", { class: "empty", text: "No channels in this category." })); return; }
+    shell.append(guideGrid(g));
+  }
+
+  function guidePickedCard(p) {
+    const now = Date.now() / 1000;
+    const live = p.s <= now && p.e > now;
+    const on = isOnScreen(p.c.server + "|" + p.c.channel);
+    const watch = el("button", { class: "btn small " + (on ? "btn-playing" : "btn-white"), type: "button", text: on ? "Playing" : live || !p.t ? "▶ Watch" : "▶ Watch channel" });
+    watch.addEventListener("click", () => run("playChannel", { server: p.c.server, channel: p.c.channel }, watch).then(() => setTimeout(pollPlayer, 1500)));
+    const close = el("button", { class: "btn small icon", type: "button", "aria-label": "Close", text: "✕" });
+    close.addEventListener("click", () => { remote.guide.picked = null; renderRemote(); });
+    return el("div", { class: "epg-picked" + (live ? " live" : "") },
+      art(p.c.image, "logo", p.c.name),
+      el("div", { class: "grow" },
+        el("div", { class: "epg-picked-title", text: p.t || p.c.name }),
+        el("div", { class: "sub" },
+          live ? el("span", { class: "live-dot", text: "LIVE" }) : null,
+          (live ? " " : "") + (p.s ? `${dayText(p.s) === "Today" ? "" : dayText(p.s) + " · "}${timeText(p.s)}–${timeText(p.e)} · ` : "") + p.c.name)),
+      watch, close);
+  }
+
+  function guideGrid(g) {
+    const w = g.window || guideWindow();
+    const ppm = guidePxPerMin();
+    const width = ((w.to - w.from) / 60) * ppm;
+    const now = Date.now() / 1000;
+    const x = (t) => ((Math.max(w.from, Math.min(w.to, t)) - w.from) / 60) * ppm;
+
+    const scroller = el("div", { class: "epg-grid" });
+    const inner = el("div", { class: "epg-inner" });
+    inner.style.width = `calc(var(--epg-chan) + ${width}px)`;
+
+    // Time header (sticky top), with the corner (sticky both).
+    const head = el("div", { class: "epg-head" });
+    const corner = el("div", { class: "epg-corner", text: dayText(now) });
+    const times = el("div", { class: "epg-times" });
+    times.style.width = width + "px";
+    for (let t = w.from; t < w.to; t += 1800) {
+      const tick = el("span", { class: "epg-tick", text: timeText(t) });
+      tick.style.left = x(t) + "px";
+      tick.style.width = 30 * ppm + "px";
+      times.append(tick);
+    }
+    head.append(corner, times);
+    inner.append(head);
+
+    const body = el("div", { class: "epg-body" });
+    for (const c of g.channels) {
+      const row = el("div", { class: "epg-row" });
+      const chan = el("button", { class: "epg-chan" + (isOnScreen(c.server + "|" + c.channel) ? " playing" : ""), type: "button", title: c.name },
+        art(c.image, "logo", c.name),
+        el("span", { class: "epg-chan-name" }, el("span", { class: "chan-text", text: c.name }),
+          c.catchup ? el("span", { class: "catchup-ico", role: "img", "aria-label": "Catch-up" }) : null));
+      chan.addEventListener("click", () => { g.picked = { c, t: c.now || "", s: c.nowStart, e: c.nowEnd }; renderRemote(); });
+      const lane = el("div", { class: "epg-lane" });
+      lane.style.width = width + "px";
+      const progs = c.progs || [];
+      if (!progs.length) {
+        const cell = el("button", { class: "epg-cell empty-cell", type: "button", text: "No information available" });
+        cell.style.left = "0px"; cell.style.width = width + "px";
+        cell.addEventListener("click", () => { g.picked = { c, t: "", s: 0, e: 0 }; renderRemote(); });
+        lane.append(cell);
+      }
+      for (const p of progs) {
+        const left = x(p.s), right = x(p.e);
+        if (right - left < 2) continue;
+        const live = p.s <= now && p.e > now, ended = p.e <= now;
+        const picked = g.picked && g.picked.c === c && g.picked.s === p.s;
+        const cell = el("button", { class: "epg-cell" + (live ? " live" : ended ? " ended" : "") + (picked ? " picked" : ""), type: "button" },
+          el("span", { class: "epg-cell-title", text: p.t }),
+          el("span", { class: "epg-cell-time", text: `${timeText(p.s)} – ${timeText(p.e)}` }));
+        cell.style.left = left + "px";
+        cell.style.width = (right - left) + "px";
+        if (live) {
+          const bar = el("span", { class: "epg-cell-prog" });
+          bar.style.width = Math.max(0, Math.min(100, ((now - p.s) / (p.e - p.s)) * 100)) + "%";
+          cell.append(bar);
+        }
+        cell.addEventListener("click", () => { g.picked = { c, t: p.t, s: p.s, e: p.e }; renderRemote(); });
+        lane.append(cell);
+      }
+      row.append(chan, lane);
+      body.append(row);
+    }
+    // The now-line, across every row.
+    const line = el("div", { class: "epg-now" });
+    line.style.left = `calc(var(--epg-chan) + ${x(now)}px)`;
+    body.append(line);
+    inner.append(body);
+    scroller.append(inner);
+
+    // Keep where they were across refreshes; first time, put "now" near the left.
+    const saved = g.scroll;
+    requestAnimationFrame(() => {
+      if (saved && saved.key === g.category.key) { scroller.scrollLeft = saved.left; scroller.scrollTop = saved.top; }
+      else scroller.scrollLeft = Math.max(0, x(now) - 30 * ppm);
+    });
+    scroller.addEventListener("scroll", () => { g.scroll = { key: g.category.key, left: scroller.scrollLeft, top: scroller.scrollTop }; }, { passive: true });
+    return scroller;
   }
 
   // ---------- Sports Hub: the app's own hub ----------

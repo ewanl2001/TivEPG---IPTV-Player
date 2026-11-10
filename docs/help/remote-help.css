@@ -1023,3 +1023,57 @@ body.has-dock { padding-bottom: 96px; }
 .section-bar #section-title { flex: 1; min-width: 0; }
 .home-btn { flex: none; width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; border: 1px solid var(--line-2); background: rgba(255,255,255,.05); color: var(--text); cursor: pointer; }
 .home-btn:hover { background: rgba(255,255,255,.1); }
+
+/* ---------- Guide: the Apple TV guide without its player ---------- */
+.np-mini-info .art { flex: none; width: 46px; height: 46px; border-radius: 11px; }
+.np-mini-info .art-poster { width: 34px; height: 50px; border-radius: 7px; }
+
+.epg { --epg-chan: 108px; --epg-row: 64px; --epg-head: 40px; }
+@media (min-width: 900px) { .epg { --epg-chan: 230px; --epg-row: 84px; --epg-head: 46px; } }
+.epg .search { margin-bottom: 12px; }
+.epg-pills { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 12px; scrollbar-width: none; }
+.epg-pills::-webkit-scrollbar { display: none; }
+.epg-pill { flex: none; border: 1px solid rgba(255,255,255,0.10); background: linear-gradient(180deg, var(--e-head2), var(--e-head1));
+  color: #c9cfda; font: inherit; font-size: 14px; font-weight: 600; padding: 8px 16px; border-radius: 999px; cursor: pointer; white-space: nowrap; }
+.epg-pill.on { background: linear-gradient(180deg, var(--e-live1), var(--e-live3)); color: #fff; border-color: var(--e-accent); }
+
+.epg-picked { display: flex; align-items: center; gap: 12px; padding: 12px 14px; margin-bottom: 12px; border-radius: 14px;
+  background: linear-gradient(180deg, var(--e-surf1), var(--e-surf2)); border: 1px solid rgba(255,255,255,0.08); }
+.epg-picked.live { border-color: var(--e-accent); }
+.epg-picked .art-logo { width: 46px; height: 46px; }
+.epg-picked-title { font-weight: 700; font-size: 16px; color: #eef1f6; }
+
+.epg-grid { position: relative; overflow: auto; max-height: calc(100vh - 230px); min-height: 320px; border-radius: 16px;
+  background: linear-gradient(180deg, var(--e-head1), #05070c); border: 1px solid rgba(255,255,255,0.07); overscroll-behavior: contain; }
+.epg-grid.loading { display: grid; place-items: center; }
+.epg-inner { position: relative; }
+.epg-head { position: sticky; top: 0; z-index: 4; display: flex; height: var(--epg-head);
+  background: linear-gradient(180deg, var(--e-head1), var(--e-head2)); border-bottom: 1px solid rgba(255,255,255,0.08); }
+.epg-corner { position: sticky; left: 0; z-index: 5; flex: none; width: var(--epg-chan); display: flex; align-items: center; padding-left: 14px;
+  font-size: 13px; font-weight: 700; color: var(--e-accent); background: var(--e-head1); border-right: 1px solid rgba(255,255,255,0.08); }
+.epg-times { position: relative; flex: none; }
+.epg-tick { position: absolute; top: 0; bottom: 0; display: flex; align-items: center; padding-left: 10px; font-size: 13px; font-weight: 600;
+  color: #aeb6c4; border-left: 1px solid rgba(255,255,255,0.08); font-variant-numeric: tabular-nums; }
+.epg-body { position: relative; }
+.epg-row { display: flex; height: var(--epg-row); border-bottom: 1px solid rgba(255,255,255,0.05); }
+.epg-chan { position: sticky; left: 0; z-index: 3; flex: none; width: var(--epg-chan); display: flex; align-items: center; gap: 10px; padding: 0 10px;
+  border: 0; border-right: 1px solid rgba(255,255,255,0.08); background: linear-gradient(180deg, var(--e-head2), var(--e-head1)); color: #e6eaf0; font: inherit; text-align: left; cursor: pointer; }
+.epg-chan .art-logo { flex: none; width: 44px; height: 44px; border-radius: 10px; background: rgba(255,255,255,0.06); }
+@media (min-width: 900px) { .epg-chan .art-logo { width: 60px; height: 60px; border-radius: 12px; } }
+.epg-chan-name { min-width: 0; display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; }
+.epg-chan-name .chan-text { overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+@media (max-width: 899px) { .epg-chan-name { display: none; } .epg-chan { justify-content: center; } }
+.epg-chan.playing { box-shadow: inset 3px 0 0 var(--green, #34c759); }
+.epg-lane { position: relative; flex: none; }
+.epg-cell { position: absolute; top: 4px; bottom: 4px; display: flex; flex-direction: column; justify-content: center; gap: 3px; overflow: hidden;
+  padding: 0 12px; border: 1px solid rgba(255,255,255,0.06); border-radius: 10px; background: linear-gradient(180deg, var(--e-surf1), var(--e-surf2));
+  color: #e8ecf2; font: inherit; text-align: left; cursor: pointer; box-sizing: border-box; margin-left: 2px; }
+.epg-cell.ended { background: linear-gradient(180deg, var(--e-end1), var(--e-end2)); color: #8d95a3; }
+.epg-cell.live { background: linear-gradient(180deg, var(--e-live1), var(--e-live2) 55%, var(--e-live3)); border-color: var(--e-accent); color: #fff; }
+.epg-cell.picked, .epg-cell:focus-visible { outline: 2px solid #fff; outline-offset: -2px; }
+.epg-cell.empty-cell { color: #7f8796; font-size: 13px; }
+.epg-cell-title { font-size: 14px; font-weight: 650; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.epg-cell-time { font-size: 12px; opacity: .72; white-space: nowrap; font-variant-numeric: tabular-nums; }
+@media (min-width: 900px) { .epg-cell-title { font-size: 16px; } .epg-cell-time { font-size: 13px; } }
+.epg-cell-prog { position: absolute; left: 0; bottom: 0; height: 3px; background: rgba(255,255,255,0.85); }
+.epg-now { position: absolute; top: 0; bottom: 0; width: 2px; z-index: 2; background: var(--e-accent); box-shadow: 0 0 8px var(--e-accent); pointer-events: none; }
