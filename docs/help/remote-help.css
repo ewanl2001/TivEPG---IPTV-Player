@@ -442,8 +442,28 @@ button.item.cat-row:hover { border-color: var(--line-2); background: var(--card-
 .pin-btn.on { background: rgba(95,183,230,.14); border-color: rgba(95,183,230,.45); color: var(--blue); }
 .tab-ico { width: 28px; font-size: 20px; text-align: center; }
 .item.current-tab { border-color: rgba(95,183,230,.45); background: rgba(95,183,230,.08); }
-.btn-label-short { display: none; }
-@media (max-width: 560px) {
-  .pin-btn .btn-label, .item .btn.danger .btn-label { display: none; }
-  .item .btn.danger .btn-label-short { display: inline; }
-}
+.btn.icon.bin svg { display: block; margin: auto; }
+.pin-btn:not(.on) { filter: grayscale(1); opacity: .7; }
+.pin-btn:not(.on):hover { filter: none; opacity: 1; }
+
+/* The playing controls */
+.now-playing .np-row { align-items: flex-start; }
+.now-playing .tag { font-size: 11px; font-weight: 800; letter-spacing: .06em; color: var(--blue); background: rgba(95,183,230,.16); padding: 3px 7px; border-radius: 6px; }
+.np-fixture { margin-top: 8px; font-weight: 700; }
+.seek { width: 100%; margin: 14px 0 4px; accent-color: var(--blue); height: 28px; }
+.seek-times { display: flex; justify-content: space-between; font-size: 13px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.transport { display: flex; justify-content: center; align-items: center; gap: 12px; margin: 16px 0 6px; flex-wrap: wrap; }
+.btn.ctl { min-width: 56px; height: 48px; border-radius: 999px; font-size: 16px; font-weight: 800; padding: 0 14px; }
+.btn.ctl.small { height: 38px; font-size: 14px; }
+.btn.ctl-main { width: 64px; height: 64px; font-size: 22px; background: #fff; color: #000; border-color: #fff; }
+.btn.ctl-live { color: #fff; background: var(--red); border-color: var(--red); }
+.ctl-row { justify-content: center; margin-top: 4px; }
+.np-options { margin-top: 14px; border-top: 1px solid var(--line-2); padding-top: 6px; display: grid; gap: 2px; }
+.opt-row { display: flex; align-items: center; gap: 12px; padding: 10px 0; }
+.opt-row.disabled .title { opacity: .55; }
+.opt-row .seg { display: flex; gap: 6px; flex: 0 0 auto; }
+.track-select { max-width: 55%; }
+.now-playing .grow { flex: 1 1 0; min-width: 0; }
+.now-playing .np-row { flex-wrap: nowrap; }
+.now-playing .sub { font-size: 14px; color: var(--text-2, #A9B3C1); }
+.opt-row .sub { font-size: 13px; margin-top: 2px; }

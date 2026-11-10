@@ -317,8 +317,8 @@
     $("section-title").textContent = section ? section.title : "";
     for (const panel of document.querySelectorAll(".tab-panel")) panel.hidden = panel.id !== "tab-" + name;
     if (push) history.pushState({ section: name }, "");
-    if (name === "remote") remoteMode(remote.mode === "goto" ? "goto" : remote.mode);
-    else if (typeof remoteRefreshEvery === "function") remoteRefreshEvery(0);
+    if (name === "remote") { remoteMode(remote.mode === "goto" ? "goto" : remote.mode); startPlayerPoll(); }
+    else if (typeof remoteRefreshEvery === "function") { remoteRefreshEvery(0); startPlayerPoll(false); }
     window.scrollTo({ top: 0 });
     if (!name) renderHome();
   }
@@ -540,7 +540,7 @@
   });
   $("reload-all").addEventListener("click", () => run("reload", {}, $("reload-all")));
 
-  // ---------- reordering: drag by the ⠿ handle (mouse or touch), or the Top / ▲ / ▼ / Bottom buttons ----------
+  // ---------- reordering: drag by the ⠿ handle (mouse or touch), or the Top / Bottom buttons ----------
   function moveIndex(arr, from, to) {
     const out = arr.slice();
     const [x] = out.splice(from, 1);
@@ -559,7 +559,15 @@
       b.addEventListener("click", () => onMove(i, to));
       return b;
     };
-    return [mk("⤒", "Move to top", 0), mk("▲", "Move up", i - 1, "fine"), mk("▼", "Move down", i + 1, "fine"), mk("⤓", "Move to bottom", n - 1)];
+    return [mk("⤒", "Move to top", 0), mk("⤓", "Move to bottom", n - 1)];
+  }
+
+  // A bin: every list's Remove, compact enough for a phone.
+  const BIN_SVG = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>';
+  function binButton(label) {
+    const b = el("button", { class: "btn small icon danger bin", type: "button", "aria-label": label, title: label });
+    b.innerHTML = BIN_SVG;
+    return b;
   }
 
   // Rows must each contain a .handle. onMove(from, to) is called once, on release.
@@ -722,8 +730,8 @@
     const all = catsFor(kind);
     const shown = all.filter((c) => c.shown);
     panel.append(el("p", { class: "hint", text: kind === "live"
-      ? "Open a group, then drag ⠿ to reorder, or use ⤒ / ⤓ to move to the top or bottom of that group · 📌 Pin puts it at the top of their guide · Remove switches it off"
-      : "The rows on their " + (kind === "vod" ? "Movies" : "Series") + " page, top to bottom. Drag ⠿ to reorder, or use ⤒ / ⤓ to move to the top or bottom · Remove switches it off" }));
+      ? "Open a group, then drag ⠿ to reorder, or use ⤒ / ⤓ to move to the top or bottom of that group · 📌 pins it to the top of their guide · the bin switches it off"
+      : "The rows on their " + (kind === "vod" ? "Movies" : "Series") + " page, top to bottom. Drag ⠿ to reorder, or use ⤒ / ⤓ to move to the top or bottom · the bin switches it off" }));
     if (!shown.length) {
       panel.append(el("p", { class: "empty", text: "Nothing is switched on. Pick categories from a playlist above." }));
     }
@@ -789,17 +797,22 @@
         run("reorderGroup", { kind, group: g.id, keys: next.map((c) => c.key) });
       };
       const rows = g.cats.map((c, i) => {
-        const remove = el("button", { class: "btn small danger", type: "button", "aria-label": g.pinned ? "Unpin" : "Remove" },
-          el("span", { class: "btn-label-short", text: "✕" }), el("span", { class: "btn-label", text: g.pinned ? "Unpin" : "Remove" }));
-        remove.addEventListener("click", () => g.pinned ? run("unpinCategory", { key: c.key }, remove) : setShown(kind, [c], false));
+        // In Pinned, the lit pin unpins; elsewhere the bin switches the category off.
+        let remove;
+        if (g.pinned) {
+          remove = el("button", { class: "btn small icon pin-btn on", type: "button", "aria-label": "Unpin", title: "Unpin from the top of the guide", text: "📌" });
+          remove.addEventListener("click", () => run("unpinCategory", { key: c.key }, remove));
+        } else {
+          remove = binButton("Switch off " + c.name);
+          remove.addEventListener("click", () => setShown(kind, [c], false));
+        }
         // Pin: puts it in Pinned at the top of their guide, as the pin in the app's Display Order.
         let pin = null;
         if (!g.pinned) {
           const isPinned = pinnedKeys.has(c.key);
-          pin = el("button", { class: "btn small pin-btn" + (isPinned ? " on" : ""), type: "button",
-            title: isPinned ? "Unpin from the top of the guide" : "Pin to the top of the guide",
-            "aria-label": isPinned ? "Unpin" : "Pin" },
-            "📌", el("span", { class: "btn-label", text: isPinned ? " Pinned" : " Pin" }));
+          pin = el("button", { class: "btn small icon pin-btn" + (isPinned ? " on" : ""), type: "button",
+            title: isPinned ? "Pinned: tap to unpin" : "Pin to the top of the guide",
+            "aria-label": isPinned ? "Unpin" : "Pin", text: "📌" });
           pin.addEventListener("click", () => run(isPinned ? "unpinCategory" : "pinCategory", { key: c.key }, pin));
         }
         const row = el("div", { class: "item" }, dragHandle(c.name),
@@ -825,7 +838,7 @@
       run("reorderGroup", { kind, group: "all", keys: next.map((c) => c.key) });
     };
     const rows = shown.map((c, i) => {
-      const remove = el("button", { class: "btn small danger", type: "button", text: "Remove" });
+      const remove = binButton("Switch off " + c.name);
       remove.addEventListener("click", () => setShown(kind, [c], false));
       const row = el("div", { class: "item" }, dragHandle(c.name),
         el("span", { class: "num", text: String(i + 1) }),
@@ -1086,7 +1099,7 @@
     const comps = el("div", { class: "hub-card" });
     if (!(sports.favouriteCompetitions || []).length) comps.append(el("p", { class: "empty flat", text: "No favourite competitions. Tap ☆ on a competition above." }));
     for (const c of sports.favouriteCompetitions || []) {
-      const remove = el("button", { class: "btn small", type: "button", text: "Remove" });
+      const remove = binButton("Remove " + c.name);
       remove.addEventListener("click", () => run("sportsFavouriteCompetition", { id: c.id, favourite: false }));
       comps.append(hubRow({ title: c.name, trailing: [remove] }));
     }
@@ -1096,7 +1109,7 @@
     const teams = el("div", { class: "hub-card" });
     if (!(sports.favouriteTeams || []).length) teams.append(el("p", { class: "empty flat", text: "No favourite teams. They can star a team in the Sports Hub." }));
     for (const name of sports.favouriteTeams || []) {
-      const remove = el("button", { class: "btn small", type: "button", text: "Remove" });
+      const remove = binButton("Remove " + name);
       remove.addEventListener("click", () => run("sportsRemoveTeam", { name }));
       teams.append(hubRow({ title: name, trailing: [remove] }));
     }
@@ -1225,7 +1238,7 @@
       run("favouritesOrder", { ids: snapshot.favourites.map((f) => f.id) });
     };
     const favRows = favs.map((f, i) => {
-      const remove = el("button", { class: "btn small danger", type: "button", text: "Remove" });
+      const remove = binButton("Remove " + f.name);
       remove.addEventListener("click", () => run("removeFavourite", { id: f.id }, remove));
       const row = el("div", { class: "item" }, dragHandle(f.name),
         el("span", { class: "num", text: String(i + 1) }),
@@ -1265,7 +1278,7 @@
       run("homeOrder", { ids: snapshot.home.map((h) => h.id) });
     };
     const homeRowsEls = home.map((h, i) => {
-      const remove = el("button", { class: "btn small danger", type: "button", text: "Remove" });
+      const remove = binButton("Remove " + h.title);
       remove.disabled = home.length <= 1;
       remove.addEventListener("click", () => run("homeRemove", { id: h.id }, remove));
       const row = el("div", { class: "item" }, dragHandle(h.title),
@@ -1285,7 +1298,7 @@
     if (!reminders.length) remList.append(el("p", { class: "empty", text: "No reminders set." }));
     for (const r of reminders) {
       const when = new Date(r.start * 1000);
-      const remove = el("button", { class: "btn small danger", type: "button", text: "Remove" });
+      const remove = binButton("Remove reminder");
       remove.addEventListener("click", () => run("removeReminder", { key: r.key }, remove));
       remList.append(el("div", { class: "item" },
         el("div", { class: "grow" }, el("div", { class: "title", text: r.title }),
@@ -1502,16 +1515,11 @@
     const keepFocus = document.activeElement && document.activeElement.dataset.remotefilter;
     panel.replaceChildren();
 
-    // On their screen now
-    const np = snapshot.nowPlaying || {};
-    const stop = el("button", { class: "btn small danger", type: "button", text: "Stop" });
-    stop.addEventListener("click", () => run("stopPlayback", {}, stop));
-    panel.append(el("div", { class: "card now-playing" },
-      el("div", { class: "sub", text: "ON THEIR SCREEN NOW" }),
-      el("div", { class: "row-actions tight np-row" },
-        el("div", { class: "grow title-lg", text: np.active ? np.name : "Nothing playing" }),
-        np.active ? stop : null),
-      snapshot.currentTab ? el("div", { class: "sub", text: `${np.active && np.fullScreen ? "Full screen, over" : "On"} the ${snapshot.currentTab} tab` }) : null));
+    // On their screen now, with the player's controls while something plays.
+    const np = nowPlaying();
+    const npBox = el("div", { id: "np-box" });
+    panel.append(npBox);
+    renderNowPlaying(npBox);
 
     const modes = el("div", { class: "subtabs remote-modes" },
       pill("📺 Guide", null, remote.mode === "guide", () => remoteMode("guide")),
@@ -1551,6 +1559,153 @@
       const f = panel.querySelector("input[data-remotefilter]");
       if (f) { f.focus(); f.setSelectionRange(f.value.length, f.value.length); }
     }
+  }
+
+  // ---------- The playing controls: a remote for whatever is on ----------
+  // Polled every few seconds while the Remote is open; the snapshot fills in between.
+  const fmtTime = (sec) => {
+    sec = Math.max(0, Math.floor(sec || 0));
+    const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), x = sec % 60;
+    return (h ? h + ":" + String(m).padStart(2, "0") : m) + ":" + String(x).padStart(2, "0");
+  };
+  function nowPlaying() {
+    const fresh = remote.player && Date.now() - remote.playerAt < 8000;
+    return (fresh ? remote.player : snapshot.nowPlaying) || {};
+  }
+  async function pollPlayer() {
+    if (currentTab !== "remote" || document.hidden || remote.scrubbing) return;
+    const r = await command("playerState", {});
+    if (!r.ok || !r.player) return;
+    remote.player = r.player;
+    remote.playerAt = Date.now();
+    const box = $("np-box");
+    const a = document.activeElement;
+    if (box && !(a && box.contains(a) && a.tagName === "SELECT")) renderNowPlaying(box);
+  }
+  function startPlayerPoll(on = true) {
+    clearInterval(remote.playerTimer);
+    remote.playerTimer = on ? setInterval(pollPlayer, 3000) : null;
+    if (on) pollPlayer();
+  }
+  // A control: sends it, then reads the player straight back so the card catches up.
+  async function control(fields, button) {
+    await run("player", fields, button);
+    setTimeout(pollPlayer, 700);
+    setTimeout(pollPlayer, 2500);
+  }
+  function ctl(label, title, fields, cls) {
+    const b = el("button", { class: "btn ctl " + (cls || ""), type: "button", "aria-label": title, title, text: label });
+    b.addEventListener("click", () => control(fields, b));
+    return b;
+  }
+
+  function renderNowPlaying(box) {
+    const np = nowPlaying();
+    box.replaceChildren();
+    const card = el("div", { class: "card now-playing" }, el("div", { class: "sub", text: "ON THEIR SCREEN NOW" }));
+    box.append(card);
+    if (!np.active) {
+      card.append(el("div", { class: "title-lg", text: "Nothing playing" }),
+        snapshot.currentTab ? el("div", { class: "sub", text: `On the ${snapshot.currentTab} tab. Pick something below and press Watch.` }) : null);
+      return;
+    }
+    const stop = el("button", { class: "btn small danger", type: "button", text: "Stop" });
+    stop.addEventListener("click", () => run("stopPlayback", {}, stop).then(() => setTimeout(pollPlayer, 500)));
+    const where = np.fullScreen ? "Full screen" : `In the ${snapshot.currentTab || "app"}`;
+    const kindText = np.kind === "vod" ? "" : np.kind === "timeshift" ? "Catch-up" : "Live";
+    card.append(el("div", { class: "row-actions tight np-row" },
+      el("div", { class: "grow" },
+        el("div", { class: "title-lg", text: np.name }),
+        el("div", { class: "sub" },
+          kindText ? el("span", { class: np.kind === "live" ? "live-dot" : "tag", text: kindText.toUpperCase() }) : null,
+          ` ${where}${np.paused ? " · Paused" : ""}`)),
+      stop));
+    if (np.fixture) card.append(el("div", { class: "np-fixture", text: `🏆 ${np.fixture}${np.score ? "  " + np.score : ""}` }));
+
+    // Where it's up to
+    if (np.kind === "vod" && np.duration > 0) {
+      const range = el("input", { type: "range", class: "seek", min: "0", max: "1000", value: String(Math.round((np.position / np.duration) * 1000)) });
+      const left = el("span", { text: fmtTime(np.position) });
+      range.addEventListener("pointerdown", () => { remote.scrubbing = true; });
+      for (const ev of ["pointercancel", "blur"]) range.addEventListener(ev, () => { remote.scrubbing = false; });
+      range.addEventListener("input", () => { left.textContent = fmtTime((range.value / 1000) * np.duration); });
+      range.addEventListener("change", async () => {
+        remote.scrubbing = false;
+        await control({ action: "seek", fraction: range.value / 1000 });
+      });
+      card.append(range, el("div", { class: "seek-times" }, left, el("span", { text: "-" + fmtTime(np.duration - np.position) })));
+    } else if (np.kind === "timeshift") {
+      card.append(el("div", { class: "sub", text: np.at
+        ? `Watching from ${timeText(np.at)} · ${Math.round((np.behind || 0) / 60)} min behind live` : "Opening catch-up…" }));
+    } else if (np.now) {
+      const pct = np.nowStart && np.nowEnd ? Math.max(0, Math.min(100, ((Date.now() / 1000 - np.nowStart) / (np.nowEnd - np.nowStart)) * 100)) : 0;
+      const bar = el("span", { class: "prog-fill" });
+      bar.style.width = pct + "%";
+      card.append(el("div", { class: "now-line" }, el("span", { class: "now-title", text: np.now }),
+        np.nowEnd ? el("span", { class: "sub", text: ` · until ${timeText(np.nowEnd)}` }) : null),
+        el("span", { class: "prog" }, bar),
+        np.next ? el("div", { class: "sub", text: `Next: ${np.next} · ${timeText(np.nextStart)}` }) : null);
+    }
+
+    // Transport
+    const canRewind = np.kind !== "live" || np.catchup;
+    const back = np.kind === "vod" ? 10 : 30;
+    card.append(el("div", { class: "transport" },
+      np.kind !== "vod" && np.catchup ? ctl("⏮", "Start this programme from the beginning", { action: "startOver" }) : null,
+      canRewind ? ctl(`↺ ${back}`, `Back ${back} seconds`, { action: "skip", seconds: -back }) : null,
+      ctl(np.paused ? "▶" : "❚❚", np.paused ? "Play" : "Pause", { action: "playPause" }, "ctl-main"),
+      np.kind !== "live" ? ctl("30 ↻", "Forward 30 seconds", { action: "skip", seconds: 30 }) : null,
+      np.kind === "timeshift" ? ctl("LIVE", "Back to live", { action: "goLive" }, "ctl-live") : null));
+
+    if (np.canStep) {
+      card.append(el("div", { class: "row-actions tight ctl-row" },
+        ctl("▼ Channel", "Previous channel", { action: "channel", step: -1 }, "small"),
+        ctl("Channel ▲", "Next channel", { action: "channel", step: 1 }, "small")));
+    }
+
+    // The player's own options
+    const opts = el("div", { class: "np-options" });
+    const toggleRow = (title, sub, on, onFields, offFields, disabled) => {
+      const input = el("input", { type: "checkbox", role: "switch", "aria-label": title });
+      input.checked = !!on;
+      input.disabled = !!disabled;
+      input.addEventListener("change", () => control(on ? offFields : onFields, input));
+      return el("div", { class: "opt-row" + (disabled ? " disabled" : "") },
+        el("div", { class: "grow" }, el("div", { class: "title", text: title }), sub ? el("div", { class: "sub", text: sub }) : null),
+        el("label", { class: "switch" }, input, el("span")));
+    };
+    opts.append(toggleRow("Full screen", np.fullScreen ? "" : "It's playing in the app's small player.", np.fullScreen, { action: "fullScreen", open: true }, { action: "fullScreen", open: false }));
+    if (np.kind !== "vod") {
+      opts.append(toggleRow("SportsHub Live", np.fixture ? "Live stats, scores and tables around the picture." : "Scores and tables around the picture.",
+        !!np.sportsLive, { action: "sportsLive", open: true }, { action: "sportsLive", open: false }, !np.fullScreen));
+      if (!np.fullScreen) opts.lastChild.querySelector(".sub").textContent = "Put it full screen first.";
+    }
+    if (np.kind === "live" && np.engine) {
+      const seg = el("div", { class: "seg" }, ["KSPlayer", "AVKit"].map((name) => {
+        const b = el("button", { class: "subtab" + (np.engine === name ? " active" : ""), type: "button", text: name });
+        b.addEventListener("click", () => { if (np.engine !== name) control({ action: "engine", avkit: name === "AVKit" }, b); });
+        return b;
+      }));
+      opts.append(el("div", { class: "opt-row" }, el("div", { class: "grow" }, el("div", { class: "title", text: "Player" }),
+        el("div", { class: "sub", text: "If this channel stutters or won't play, try the other one." })), seg));
+    }
+    const picker = (title, tracks, withOff, action) => {
+      const sel = el("select", { class: "track-select", "aria-label": title });
+      if (withOff) sel.append(el("option", { value: "", text: "Off" }));
+      for (const t of tracks) {
+        const o = el("option", { value: String(t.id), text: t.name });
+        if (t.on) o.selected = true;
+        sel.append(o);
+      }
+      sel.addEventListener("change", () => { control({ action, id: sel.value === "" ? null : Number(sel.value) }); sel.blur(); });
+      return el("div", { class: "opt-row" }, el("div", { class: "grow title", text: title }), sel);
+    };
+    if ((np.audio || []).length > 1) opts.append(picker("Sound", np.audio, false, "audio"));
+    if ((np.subtitles || []).length) opts.append(picker("Subtitles", np.subtitles, true, "subtitles"));
+    const restart = el("button", { class: "btn small", type: "button", text: "↻ Restart stream" });
+    restart.addEventListener("click", () => control({ action: "restart" }, restart));
+    opts.append(el("div", { class: "row-actions tight" }, restart));
+    card.append(opts);
   }
 
   function filterBox(placeholder) {
@@ -1967,7 +2122,7 @@
         customAction("customCategoryOrder", { id: cat.id, keys: customEdit.channels.map((c) => c.key) });
       };
       const rows = channels.map((ch, i) => {
-        const remove = el("button", { class: "btn small danger", type: "button", text: "Remove" });
+        const remove = binButton("Remove " + ch.name);
         remove.addEventListener("click", () => customAction("customCategoryRemove", { id: cat.id, server: ch.server, channel: ch.channel }, remove));
         const row = el("div", { class: "item" }, dragHandle(ch.name),
           el("span", { class: "num", text: String(i + 1) }),
