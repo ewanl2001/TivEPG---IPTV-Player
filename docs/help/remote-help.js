@@ -217,6 +217,31 @@
     };
   }
 
+  // The app's in-app Remote ("Connect to …") calls this when it closes (Done): end the session
+  // on their device too, so it doesn't keep saying the Remote is on. The device ends it with
+  // the relay, which closes this socket; if that doesn't happen quickly, close it ourselves.
+  window.tivepgEndSession = () => new Promise((resolve) => {
+    const socket = ws;
+    ended = true;
+    clearInterval(pingTimer);
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      try { socket && socket.close(); } catch {}
+      return resolve(false);
+    }
+    let done = false;
+    const finish = (ok) => {
+      if (done) return;
+      done = true;
+      try { socket.close(); } catch {}
+      resolve(ok);
+    };
+    socket.addEventListener("close", () => finish(true));
+    sendEncrypted({ type: "endSession", req: "end" }).then((sent) => {
+      if (!sent) finish(false);
+      else setTimeout(() => finish(true), 1500);
+    });
+  });
+
   function fail(message, wasConnected = false) {
     ended = true;
     clearInterval(pingTimer);
@@ -2662,7 +2687,7 @@
           el("th", { text: "W" }), noDraws ? null : el("th", { text: "D" }), el("th", { text: "L" }), el("th", { text: isSport(f, "soccer") ? "GD" : "+/-" }), el("th", { text: "Pts" }))),
         el("tbody", {}, g.table.map((r) => el("tr", { class: ours(r) ? "ours" : "" },
           el("td", { text: String(r.rank) }),
-          el("td", { class: "team" }, art(r.team.logo, "logo", r.team.name), el("span", { text: r.team.name })),
+          el("td", { class: "team" }, el("div", { class: "team-in" }, art(r.team.logo, "logo", r.team.name), el("span", { text: r.team.name }))),
           el("td", { text: String(r.played) }), el("td", { text: String(r.won) }), noDraws ? null : el("td", { text: String(r.drawn) }),
           el("td", { text: String(r.lost) }), el("td", { text: (r.goalsDiff > 0 ? "+" : "") + Math.round(r.goalsDiff) }), el("td", { class: "pts", text: String(r.points) })))));
       body.append(el("div", { class: "card mc-card mc-table-card" }, g.name ? el("div", { class: "mc-card-title", text: g.name }) : null, table));
@@ -4068,7 +4093,7 @@
     for (const g of groups) {
       const rows = g.table.map((r) => el("tr", {},
         el("td", { class: "rk", text: String(r.rank) }),
-        el("td", { class: "team" }, hubCrest(r.team.logo, r.team.name, "row"), el("span", { text: r.team.name })),
+        el("td", { class: "team" }, el("div", { class: "team-in" }, hubCrest(r.team.logo, r.team.name, "row"), el("span", { text: r.team.name }))),
         el("td", { text: String(r.played) }),
         compact ? null : [el("td", { text: String(r.won) }), noDraws ? null : el("td", { text: String(r.drawn) }), el("td", { text: String(r.lost) })],
         el("td", { text: (r.goalsDiff > 0 ? "+" : "") + Math.round(r.goalsDiff || 0) }),

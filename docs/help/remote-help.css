@@ -668,8 +668,12 @@ button.item.cat-row:hover { border-color: var(--line-2); background: var(--card-
 .mc-league-table th, .mc-cricket th { color: var(--text-3); font-weight: 700; font-size: 12px; padding: 6px 5px; text-align: center; }
 .mc-league-table td, .mc-cricket td { padding: 7px 5px; text-align: center; border-top: 1px solid rgba(255,255,255,0.05); }
 .mc-league-table .team, .mc-cricket .team { text-align: left; }
-.mc-league-table td.team { display: flex; align-items: center; gap: 8px; }
-.mc-league-table td.team span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 150px; }
+/* Real table cells throughout (a flex <td> splits the row lines): the club column takes the
+   spare width and truncates; the numbers size to fit. */
+.mc-league-table th, .mc-league-table td { width: 1%; white-space: nowrap; }
+.mc-league-table .team { width: 100%; max-width: 0; }
+.mc-league-table .team-in { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.mc-league-table .team-in span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mc-league-table .art-logo { width: 22px; height: 22px; border-radius: 5px; }
 .mc-league-table .art-logo img { padding: 1px; }
 .mc-league-table tr.ours td { background: rgba(30,124,255,0.14); font-weight: 700; }
@@ -679,7 +683,6 @@ button.item.cat-row:hover { border-color: var(--line-2); background: var(--card-
 .np-fixture.row-actions { align-items: center; }
 /* Phones: the points column must fit; long club names truncate instead. */
 .mc-league-table th, .mc-league-table td { padding-left: 3px; padding-right: 3px; }
-.mc-league-table td.team span { max-width: min(150px, 30vw); }
 .mc-league-table td.team .art-logo { width: 20px; height: 20px; }
 @media (max-width: 420px) { .mc-league-table { font-size: 13px; } }
 
@@ -890,14 +893,18 @@ button.item.cat-row:hover { border-color: var(--line-2); background: var(--card-
 .hub-table td { text-align: center; padding: 7px 6px; color: var(--h-t2); border-top: 1px solid var(--h-line); }
 .hub-table .rk { width: 30px; color: var(--h-t3); }
 .hub-table .team { text-align: left; }
-.hub-table td.team { display: flex; align-items: center; gap: 8px; color: var(--h-t1); font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
-.hub-table td.team span { overflow: hidden; text-overflow: ellipsis; }
+/* One table: every cell stays a real table cell (a flex <td> broke out of the grid and split the
+   row lines into two blocks). The team column takes all spare width; the numbers size to fit. */
+.hub-table th, .hub-table td { width: 1%; white-space: nowrap; }
+.hub-table .team { width: 100%; max-width: 0; }
+.hub-table td.team { color: var(--h-t1); font-weight: 600; }
+.hub-table .team-in { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.hub-table .team-in span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .hub-crest.row { width: 20px; height: 20px; background: none; border-radius: 4px; }
 .hub-crest.row img { padding: 0; }
 .hub-table .pts { font-weight: 900; color: var(--h-t1); }
 .hub-table-name { padding: 12px 12px 2px; font-size: 11px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; color: var(--h-t3); }
 .hub-ios .hub-table { margin-top: 12px; background: var(--h-panel); border: 1px solid var(--h-line); border-radius: 16px; overflow: hidden; }
-.hub-ios .hub-table td.team { max-width: 150px; }
 @media (max-width: 420px) { .hub-ios .hub-table table { font-size: 13px; } .hub-ios .hub-table td, .hub-ios .hub-table th { padding-left: 4px; padding-right: 4px; } }
 
 /* A match */
@@ -963,7 +970,7 @@ button.item.cat-row:hover { border-color: var(--line-2); background: var(--card-
 .with-table .fx-centre { width: 140px; }
 .with-table .fx-score { font-size: 34px; }
 .with-table .fx-time { font-size: 27px; }
-@media (max-width: 1100px) { .hub-body.with-table { grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; } .hub-table td.team { max-width: 150px; } }
+@media (max-width: 1100px) { .hub-body.with-table { grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; } }
 .hub-crest.tile .art-letter, .hub-crest.head .art-letter { color: #3a4150; font-size: 18px; }
 
 /* ---------- Remote: app-style tab bar ---------- */
@@ -1322,7 +1329,6 @@ body.mc-open #tab-remote { width: 100%; max-width: 1240px; margin: 0 auto; }
 /* League view: the table gets a real share of a wide screen (W/D/L shown from 1300px). */
 .hub-body.with-table { grid-template-columns: minmax(0, 1fr) clamp(340px, 38%, 640px) !important; }
 .hub-body.with-table .hub-list { max-width: none; }
-.hub-side .hub-table td.team { max-width: none; }
 
 /* ---------- Live: teletext, and the SportsHub Live L-frame round it ---------- */
 body.live-on main { max-width: none !important; }
