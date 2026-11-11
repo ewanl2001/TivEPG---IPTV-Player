@@ -383,7 +383,7 @@
     try {
       const sp = remote.sports, g = remote.guide;
       if (!r.mc && mc.open) { mc.open = false; clearTimeout(mc.timer); }
-      if (r.mode !== remote.mode) { if (quiet) remote.mode = r.mode; else remoteMode(r.mode); }
+      if (r.mode !== remote.mode) { if (quiet) remote.mode = (r.mode === "live" && !LIVE_MODE_ENABLED) ? "guide" : r.mode; else remoteMode(r.mode); }
       if (navKey(r.gcat) !== navKey(g.category)) {
         if (r.gcat) openGuideCategory(r.gcat); else { g.category = null; g.channels = null; remoteRefreshEvery(0); }
       }
@@ -1568,7 +1568,11 @@
     remote.timer = ms ? setInterval(() => { if (currentTab === "remote" && !document.hidden) fn(); }, ms) : null;
   }
 
+  // SportsHub Live (teletext) is switched off for now; the code stays. Flip to true to bring it back.
+  const LIVE_MODE_ENABLED = false;
+
   async function remoteMode(mode, fromBar = false) {
+    if (mode === "live" && !LIVE_MODE_ENABLED) mode = "guide";
     // Leaving the match centre from the app bar: close it, or it stays drawn over every tab.
     if (fromBar && mc.open) { mc.open = false; clearTimeout(mc.timer); document.body.classList.remove("mc-open"); }
     remote.mode = mode;
@@ -1720,10 +1724,19 @@
     const np = nowPlaying();
     return !!(np.active && np.key && np.key === key);
   }
+  // Watch from a guide category: the TV's Guide moves to that category too, so the person
+  // being helped can change channel from there. Not for search results or Sports Hub games
+  // (those open the game's page instead).
+  function guideSpot(extra) {
+    if (extra && extra.fixture) return {};
+    const g = remote.guide;
+    if (remote.mode !== "guide" || !g.category || (g.filter || "").trim()) return {};
+    return { category: g.category.key };
+  }
   function channelRow(c, extra) {
     const on = isOnScreen(c.server + "|" + c.channel);
     const watch = el("button", { class: "btn small " + (on ? "btn-playing" : "btn-white"), type: "button", text: on ? "Playing" : "▶ Watch" });
-    watch.addEventListener("click", () => run("playChannel", { server: c.server, channel: c.channel, ...(extra || {}) }, watch).then(() => setTimeout(pollPlayer, 1500)));
+    watch.addEventListener("click", () => run("playChannel", { server: c.server, channel: c.channel, ...guideSpot(extra), ...(extra || {}) }, watch).then(() => setTimeout(pollPlayer, 1500)));
     let progress = null;
     if (c.nowStart && c.nowEnd) {
       const pct = Math.max(0, Math.min(100, ((Date.now() / 1000 - c.nowStart) / (c.nowEnd - c.nowStart)) * 100));
@@ -1758,7 +1771,7 @@
     const modes = el("div", { class: "remote-modes", role: "tablist" },
       pill("📺 Guide", null, remote.mode === "guide", () => remoteMode("guide", true)),
       pill("🏆 Sports Hub", null, remote.mode === "sports", () => remoteMode("sports", true)),
-      pill("📡 Live", null, remote.mode === "live", () => remoteMode("live", true)),
+      LIVE_MODE_ENABLED ? pill("📡 Live", null, remote.mode === "live", () => remoteMode("live", true)) : null,
       tabOn("Movies") ? pill("🎬 Movies", null, remote.mode === "vod", () => remoteMode("vod", true)) : null,
       tabOn("Series") ? pill("🎞️ Series", null, remote.mode === "series", () => remoteMode("series", true)) : null,
       pill("Tabs", null, remote.mode === "goto", () => remoteMode("goto", true)));
@@ -3312,7 +3325,7 @@
     const play = el("button", { class: "gl-play" + (on ? " on" : ""), type: "button",
       "aria-label": on ? `${c.name} is playing` : `Watch ${c.name}`, title: on ? "Playing" : "Watch" });
     play.append(on ? el("span", { class: "gl-eq", "aria-hidden": "true" }, el("i"), el("i"), el("i")) : el("span", { class: "gl-tri", "aria-hidden": "true" }));
-    play.addEventListener("click", () => run("playChannel", { server: c.server, channel: c.channel }, play).then(() => setTimeout(pollPlayer, 1500)));
+    play.addEventListener("click", () => run("playChannel", { server: c.server, channel: c.channel, ...guideSpot() }, play).then(() => setTimeout(pollPlayer, 1500)));
     const now = Date.now() / 1000;
     let bar = null;
     if (c.nowStart && c.nowEnd) {
@@ -3342,7 +3355,7 @@
     const live = p.s <= now && p.e > now;
     const on = isOnScreen(p.c.server + "|" + p.c.channel);
     const watch = el("button", { class: "btn small " + (on ? "btn-playing" : "btn-white"), type: "button", text: on ? "Playing" : live || !p.t ? "▶ Watch" : "▶ Watch channel" });
-    watch.addEventListener("click", () => run("playChannel", { server: p.c.server, channel: p.c.channel }, watch).then(() => setTimeout(pollPlayer, 1500)));
+    watch.addEventListener("click", () => run("playChannel", { server: p.c.server, channel: p.c.channel, ...guideSpot() }, watch).then(() => setTimeout(pollPlayer, 1500)));
     const close = el("button", { class: "btn small icon", type: "button", "aria-label": "Close", text: "✕" });
     close.addEventListener("click", () => { remote.guide.picked = null; renderRemote(); });
     return el("div", { class: "epg-picked" + (live ? " live" : "") },
