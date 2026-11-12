@@ -585,6 +585,23 @@
         el("p", { class: "hint tool-hint", text: "If programmes are missing or wrong, Fetch first. If that doesn't fix it, Clear, then Fetch." }),
         el("div", { class: "row-actions" }, fetch, clear)));
 
+    // Sports matching (12 Nov 2026): Settings > Programme Guide > "Match sports after each fetch".
+    if ("sportsMatching" in t) {                            // older apps don't send it
+      const sw = el("input", { type: "checkbox", "aria-label": "Match sports after each fetch" });
+      sw.checked = !!t.sportsMatching;
+      sw.addEventListener("change", async () => {
+        const r = await run("setSportsMatching", { enabled: sw.checked });
+        if (!r.ok) sw.checked = !sw.checked;
+      });
+      box.append(el("h4", { class: "hub-section", text: "Sports matching" }),
+        el("div", { class: "card tool-card" }, el("div", { class: "opt-row" },
+          el("div", { class: "grow" }, el("div", { class: "title", text: "Match sports after each fetch" }),
+            el("div", { class: "sub wrap-sub", text: t.sportsMatching
+              ? "On: every upcoming game is matched to their channels in the background, so fixtures, Replay and Director open instantly."
+              : "Off: official broadcasters are still found automatically. Other channels are searched when they open a game." })),
+          el("label", { class: "switch", title: "On or off" }, sw, el("span")))));
+    }
+
     // Copy Setup
     const copy = el("button", { class: "item cat-row", type: "button" },
       el("div", { class: "grow" }, el("div", { class: "title", text: "Copy your setup to theirs" }),
