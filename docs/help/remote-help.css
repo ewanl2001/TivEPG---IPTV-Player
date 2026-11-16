@@ -1438,3 +1438,20 @@ body.live-on footer, body.live-on #np-dock { display: none !important; }
 }
 .tt-fast button.c-r { color: #ff3030 !important; } .tt-fast button.c-g { color: #00ff00 !important; }
 .tt-fast button.c-y { color: #ffff00 !important; } .tt-fast button.c-c { color: #00ffff !important; }
+
+/* ---------- Site menu (join + ended screens only; never while connected) ---------- */
+.rh-nav { display: none; position: relative; z-index: 5; border-bottom: 1px solid var(--line); background: rgba(10,14,21,.72); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px); }
+body:has(#screen-join:not([hidden])) .rh-nav,
+body:has(#screen-ended:not([hidden])) .rh-nav { display: block; }
+.rh-nav-in { max-width: 1200px; margin: 0 auto; padding: 0 24px; height: 64px; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.rh-brand { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; color: var(--text); }
+.rh-brand img { width: 28px; height: 28px; border-radius: 8px; }
+.rh-links { list-style: none; display: flex; align-items: center; gap: 26px; font-size: 15px; }
+.rh-links a { color: var(--text-2); transition: color .2s var(--ease); }
+.rh-links a:hover, .rh-links a.current { color: var(--text); }
+.rh-links .rh-get { color: #0A0E15; background: #fff; padding: 8px 16px; border-radius: 999px; font-weight: 600; font-size: 14px; }
+.rh-links .rh-get:hover { color: #0A0E15; }
+@media (max-width: 860px) {
+  .rh-nav-in { padding: 0 16px; height: 58px; }
+  .rh-links li:not(:last-child) { display: none; }
+}
