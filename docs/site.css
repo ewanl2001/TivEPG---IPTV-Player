@@ -295,3 +295,12 @@ footer a:hover { color: var(--text); }
 .teaser .headline { margin-top: 14px; font-size: clamp(30px, 3.8vw, 48px); }
 .teaser .lede { margin-top: 16px; }
 @media (max-width: 980px) { .teaser { grid-template-columns: 1fr; padding: 24px; gap: 28px; } }
+
+/* ---------- TivEPG Remote teaser ---------- */
+.teaser-remote { background: radial-gradient(70% 90% at 100% 0%, rgba(95,183,230,.13), transparent 70%), var(--ground-2); }
+.remote-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.remote-steps li { display: flex; gap: 14px; align-items: flex-start; padding: 16px 18px; border-radius: 16px; border: 1px solid var(--line); background: rgba(255,255,255,.02); }
+.remote-steps li > span { flex: none; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 14px; color: var(--ground); background: var(--blue); }
+.remote-steps b { color: var(--text); }
+.remote-steps p { margin: 4px 0 0; color: var(--text-2); font-size: 15px; }
+.remote-steps .remote-trust { border: 0; background: none; padding: 4px 2px 0; color: var(--text-3); font-size: 14px; }
